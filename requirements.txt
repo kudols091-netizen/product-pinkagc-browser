@@ -1,0 +1,8 @@
+camoufox[geoip]>=0.5.8
+zstandard>=0.22
+flask>=3.0
+playwright>=1.40
+opencv-python-headless>=4.9
+numpy>=1.26
+py7zr>=0.21
+PySocks>=1.7          # proxy socks5/4 — relay auth + checker

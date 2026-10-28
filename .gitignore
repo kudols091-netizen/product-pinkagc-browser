@@ -1,0 +1,16 @@
+# runtime / dữ liệu sinh ra — không commit
+__pycache__/
+*.pyc
+*.log
+# engine binary tải về (camoufox/botbrowser/ovobrowser)
+vendor/
+# user-data-dir trình duyệt (cache, cookie, LOG...)
+asset/profiles/
+# DB profile/team sinh lúc chạy (kèm file WAL -wal/-shm)
+asset/*.db
+asset/*.db-wal
+asset/*.db-shm
+# ảnh chụp gate/UI
+_screenshots/
+# config tool design cục bộ
+.impeccable/
