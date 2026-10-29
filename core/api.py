@@ -596,6 +596,29 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         return _ok({"app": brand.APP_NAME, "running": list(running),
                     "engines": engines.ENGINES, "profiles": len(db.list_profiles())})
 
+    @app.get("/api/v3/version")
+    def version():
+        return _ok({"name": brand.APP_NAME, "version": brand.VERSION})
+
+    @app.get("/api/v3/check-update")
+    def check_update():
+        """So phiên bản với brand.UPDATE_URL (JSON {version,url,notes}). Trống = tắt. Thuần stdlib."""
+        import re as _re
+        url = getattr(brand, "UPDATE_URL", "")
+        if not url:
+            return _ok({"current": brand.VERSION, "has_update": False, "reason": "chưa cấu hình UPDATE_URL"})
+        try:
+            import urllib.request
+            with urllib.request.urlopen(url, timeout=6) as r:
+                info = json.loads(r.read().decode("utf-8"))
+        except Exception as e:                       # noqa: BLE001
+            return _ok({"current": brand.VERSION, "has_update": False, "error": str(e)})
+        latest = str(info.get("version", ""))
+        tup = lambda v: tuple(int(x) for x in _re.findall(r"\d+", v)[:3])
+        has = bool(latest) and tup(latest) > tup(brand.VERSION)
+        return _ok({"current": brand.VERSION, "latest": latest, "has_update": has,
+                    "url": info.get("url", ""), "notes": info.get("notes", "")})
+
     return app
 
 

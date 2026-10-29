@@ -12,6 +12,7 @@
     --ink:#2A2233; --mut:#8A8A95; --mut2:#B6AFBC;
     --ok:#1FA971; --okbg:#E6F7EC; --warn:#E8A200; --err:#E5484D; --errbg:#FDEAEA;
     --r:12px; --r-sm:9px;
+    --sidebar-w:232px; --row-h:54px; --btn-h:38px;
     --shadow:0 1px 3px rgba(40,10,40,.06), 0 8px 24px rgba(180,30,120,.06);
     color-scheme:light;
   }
@@ -22,7 +23,7 @@
   a{color:inherit}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-thumb{background:#e3cede;border-radius:8px;border:2px solid transparent;background-clip:content-box}
-  .app{display:grid;grid-template-columns:272px 1fr;height:100vh;overflow:hidden}
+  .app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;height:100vh;overflow:hidden}
 
   /* ---------- Sidebar ---------- */
   .side{background:var(--sidebar);color:#e9eaf0;display:flex;flex-direction:column;overflow:hidden}
@@ -61,7 +62,7 @@
 
   /* ---------- Buttons / inputs ---------- */
   button{font:inherit}
-  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:10px;padding:10px 16px;font-weight:700;
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;padding:9px 16px;min-height:var(--btn-h);font-weight:700;
     cursor:pointer;border:1px solid var(--line2);background:#fff;color:var(--ink);transition:.12s;white-space:nowrap}
   .btn:hover{background:#faf2f7;border-color:var(--line2)}
   .btn svg{width:17px;height:17px;stroke-width:2.2}
@@ -110,11 +111,15 @@
   .toolbar .grow{flex:1}
 
   /* ---------- Table ---------- */
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:visible}
   table{width:100%;border-collapse:collapse}
   thead th{text-align:left;font-size:12px;font-weight:700;color:var(--mut);text-transform:none;
-    padding:14px 16px;border-bottom:1px solid var(--line);background:#fffafd;white-space:nowrap}
-  tbody td{padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+    padding:14px 16px;border-bottom:1px solid var(--line);background:#fffafd;white-space:nowrap;
+    position:sticky;top:0;z-index:5}
+  .card>table thead th:first-child{border-top-left-radius:var(--r)}
+  .card>table thead th:last-child{border-top-right-radius:var(--r)}
+  tbody tr{height:var(--row-h)}
+  tbody td{padding:9px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
   tbody tr:last-child td{border-bottom:0}
   tbody tr:hover{background:#fff8fc}
   td>svg{width:18px;height:18px;vertical-align:-4px;color:var(--mut)}
@@ -137,6 +142,44 @@
   .mono{font-family:ui-monospace,"Cascadia Mono",monospace;font-size:12.5px}
   .rowact{display:flex;gap:6px;justify-content:flex-end;align-items:center}
   .colordot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px;vertical-align:middle}
+  /* ô Profile 2 dòng */
+  .pcell b{display:block;font-weight:700;line-height:1.25}
+  .pcell .psub{font-size:12px;color:var(--mut2);margin-top:2px;font-weight:500}
+  .gchip{font-size:12px;font-weight:600;color:#7a7183;background:#f3eef1;padding:3px 9px;border-radius:7px;white-space:nowrap}
+  /* nút copy nhỏ trong ô */
+  .icplain{border:0;background:none;color:var(--mut2);cursor:pointer;padding:2px;vertical-align:middle;line-height:0}
+  .icplain:hover{color:var(--primary)}
+  .icplain svg{width:14px;height:14px}
+  /* kebab menu ⋯ (dùng chung) */
+  .kebab{position:relative;display:inline-block}
+  .kmenu{position:absolute;right:0;top:calc(100% + 4px);z-index:25;background:var(--card);border:1px solid var(--line);
+    border-radius:11px;box-shadow:0 12px 34px rgba(60,10,50,.18);padding:6px;min-width:184px;display:none}
+  .kmenu.show{display:block}
+  .kmenu button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:9px 11px;border-radius:8px;
+    font:inherit;font-weight:600;color:var(--ink);cursor:pointer;text-align:left;white-space:nowrap}
+  .kmenu button:hover{background:var(--primary-soft);color:var(--primary)}
+  .kmenu button svg{width:16px;height:16px;stroke-width:2;flex:none;color:inherit}
+  .kmenu button.danger{color:var(--err)} .kmenu button.danger:hover{background:var(--errbg);color:var(--err)}
+  .kmenu .ksep{height:1px;background:var(--line);margin:5px 4px}
+  /* Developer: nav danh mục trái */
+  .devnav{display:flex;align-items:center;gap:9px;width:100%;border:0;background:none;color:var(--ink);padding:9px 12px;border-radius:9px;font:inherit;font-weight:600;cursor:pointer;text-align:left;margin:1px 0}
+  .devnav:hover{background:#faf2f7}
+  .devnav.on{background:var(--primary-soft);color:var(--primary)}
+  .devnav svg{width:16px;height:16px;flex:none;stroke-width:2}
+  .devnav>.n{margin-left:auto;font-size:11px;color:var(--mut2);font-weight:700}
+  /* step số (MCP) */
+  .stepn{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--primary);color:#fff;font-size:13px;font-weight:800;margin-right:9px;flex:none}
+  .steph{display:flex;align-items:center;margin:0 0 4px}
+  /* home stat */
+  .statn{font-family:inherit;font-size:30px;font-weight:800;margin-top:6px;color:var(--primary);line-height:1}
+  .statl{font-size:12px;color:var(--mut);font-weight:600}
+  /* trình dựng automation */
+  .austep{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .austep>select{width:auto;min-width:140px}
+  .austep>input{flex:1;min-width:110px}
+  .auno{width:22px;height:22px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-size:12px;font-weight:800;flex:none}
+  .austep .gp{margin-left:auto;display:flex;gap:4px}
+  .austep .gp .btn{padding:6px 9px}
 
   /* pagination */
   .pager{display:flex;align-items:center;gap:14px;justify-content:space-between;padding:14px 18px;color:var(--mut);font-size:13px}
@@ -155,8 +198,14 @@
   .overlay{position:fixed;inset:0;background:rgba(30,10,30,.42);display:none;align-items:flex-start;justify-content:center;
     padding:34px 20px;z-index:40;overflow:auto}
   .overlay.show{display:flex}
-  .modal{background:#fff;border-radius:16px;box-shadow:0 30px 80px rgba(60,10,50,.3);width:min(980px,100%);overflow:hidden}
+  .modal{background:#fff;border-radius:16px;box-shadow:0 30px 80px rgba(60,10,50,.3);width:min(980px,100%);
+    display:flex;flex-direction:column;max-height:calc(100vh - 56px)}
   .modal.sm{width:min(460px,100%)}
+  .modal.lg{width:min(1200px,100%)}
+  .mbody{overflow:auto;flex:1 1 auto}
+  .mfoot{position:sticky;bottom:0}
+  .ferr{color:var(--err);font-size:12.5px;margin-top:5px;font-weight:600;display:none}
+  .ferr.show{display:block}
   .mhead{display:flex;align-items:center;gap:12px;padding:20px 24px;border-bottom:1px solid var(--line)}
   .mhead .ic{width:40px;height:40px;border-radius:11px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center}
   .mhead .ic svg{width:22px;height:22px;stroke-width:2.2}
@@ -189,6 +238,42 @@
   #toast.ok:before{background:var(--ok)} #toast.err:before{background:var(--err)}
   .dim{color:var(--mut)}
   .flag{font-size:16px;margin-right:7px}
+
+  /* ===== Dark mode ===== */
+  :root[data-theme="dark"]{
+    --sidebar:#121019; --sidebar-hover:#221c2e; --sidebar-line:#2c2638;
+    --primary:#ff3d9a; --primary-dark:#e21a7f; --primary-soft:#3a1430;
+    --page:#141019; --card:#1e1926; --line:#2e2738; --line2:#3a3246;
+    --ink:#efe9f3; --mut:#9f93ad; --mut2:#6e6479;
+    --ok:#3fd089; --okbg:#15311f; --warn:#e0a53a; --err:#ff5a5f; --errbg:#331518;
+    --shadow:0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    color-scheme:dark;
+  }
+  [data-theme="dark"] ::-webkit-scrollbar-thumb{background:#3a3246}
+  [data-theme="dark"] thead th{background:#241d30}
+  [data-theme="dark"] tbody tr:hover{background:#241d30}
+  [data-theme="dark"] .btn{background:#241d30}
+  [data-theme="dark"] .btn:hover{background:#2e2740}
+  [data-theme="dark"] .btn.pri{color:#fff}
+  [data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:#17131f;color:var(--ink)}
+  [data-theme="dark"] .seg button{background:#17131f;color:var(--mut)}
+  [data-theme="dark"] .seg button.on{background:var(--primary-soft);color:var(--primary)}
+  [data-theme="dark"] .modal{background:#1e1926}
+  [data-theme="dark"] .mfoot{background:#241d30}
+  [data-theme="dark"] .summary{background:#241d30}
+  [data-theme="dark"] .hint{background:#15311f;border-color:#1f4d33;color:#8fe0b0}
+  [data-theme="dark"] .pager .pages button{background:#241d30;color:var(--ink)}
+  [data-theme="dark"] .devnav:hover{background:#241d30}
+  [data-theme="dark"] .tag{background:#2e2740;color:#b8acc4}
+  [data-theme="dark"] .gchip{background:#2e2740;color:#b8acc4}
+  [data-theme="dark"] .tagchip{background:var(--primary-soft);color:#ff8cc4}
+  [data-theme="dark"] .iconbtn:hover{background:#2e1a28}
+  [data-theme="dark"] .mhead .x:hover{background:#2e2740}
+  [data-theme="dark"] .kmenu button{color:var(--ink)}
+  [data-theme="dark"] .empty img,[data-theme="dark"] .brand img{filter:none}
+  [data-theme="dark"] .btn.pri{box-shadow:0 2px 8px rgba(0,0,0,.35)}
+  [data-theme="dark"] .nav button.on{box-shadow:none}
+  [data-theme="dark"] .pill.run{background:#15311f;border-color:#1f4d33}
 </style>
 </head>
 <body>
@@ -205,7 +290,7 @@
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
-      <button class="iconbtn" title="Giao diện tối (sắp có)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg></button>
+      <button class="iconbtn" id="themeBtn" title="Sáng / Tối" onclick="toggleTheme()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg></button>
       <button class="iconbtn" title="Ngôn ngữ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></button>
       <button class="iconbtn" title="Làm mới" onclick="refresh()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg></button>
       <span class="vline"></span>
@@ -274,11 +359,15 @@ function fmtAgo(iso){if(!iso)return "—";const s=(Date.now()-new Date(iso).getT
 function proxyBadge(raw){if(!raw)return '<span class="dim">Không proxy</span>';
   const sch=(raw.includes("://")?raw.split("://")[0]:"http").toUpperCase();
   const hostport=raw.replace(/^[a-z0-9]+:\/\//i,"").split(/[:@]/).slice(0,2).join(":");
-  return `<span class="tag">${esc(sch)}</span> <span class="mono dim">${esc(hostport)}</span>`;}
-const tagChips=tags=>(tags&&tags.length)?tags.map(t=>`<span class="tagchip">${esc(t)}</span>`).join(""):'<span class="dim">—</span>';
+  return `<span class="tag">${esc(sch)}</span> <span class="mono dim">${esc(hostport)}</span>`
+    +` <button class="icplain" title="Sao chép" onclick="event.stopPropagation();cp('${esc(hostport)}')">${svg(I.copy)}</button>`;}
+const tagChips=tags=>{if(!tags||!tags.length)return '<span class="dim">—</span>';
+  const shown=tags.slice(0,2).map(t=>`<span class="tagchip">${esc(t)}</span>`).join("");
+  return shown+(tags.length>2?`<span class="tagchip" style="background:#efe9ee;color:var(--mut)" title="${esc(tags.slice(2).join(', '))}">+${tags.length-2}</span>`:"");};
 const allTags=()=>[...new Set(STATE.profiles.flatMap(p=>p.tags||[]))].sort();
 const OPTCOLS=[["os","OS"],["browser","Browser"],["engine","Engine"],["tz","Timezone"],["lastrun","Lần chạy cuối"],["tags","Tags"]];
-function loadHcol(){try{return new Set(JSON.parse(localStorage.getItem("pinkagc_hcol")||"[]"));}catch(e){return new Set();}}
+const HCOL_DEFAULT=["os","browser","engine","tz"];   // mặc định ẩn cột kỹ thuật (lần đầu, chưa có lưu)
+function loadHcol(){try{const s=localStorage.getItem("pinkagc_hcol");return new Set(s===null?HCOL_DEFAULT:JSON.parse(s));}catch(e){return new Set(HCOL_DEFAULT);}}
 let HCOL=loadHcol();
 const hcolClass=()=>[...HCOL].map(k=>"hcol-"+k).join(" ");
 function toggleCol(k,on){on?HCOL.delete(k):HCOL.add(k);try{localStorage.setItem("pinkagc_hcol",JSON.stringify([...HCOL]));}catch(e){}
@@ -286,6 +375,15 @@ function toggleCol(k,on){on?HCOL.delete(k):HCOL.add(k);try{localStorage.setItem(
 function toggleColMenu(){const m=document.getElementById("colMenu");if(m)m.style.display=m.style.display==="block"?"none":"block";}
 function onSearch(v){STATE.q=v;STATE.page=1;render();const e=document.getElementById("pq");if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}}
 function gotoPage(n){STATE.page=Math.max(1,n);render();}
+/* Dark mode: lưu localStorage, áp lên <html data-theme> */
+function applyTheme(t){document.documentElement.setAttribute("data-theme",t);try{localStorage.setItem("pinkagc_theme",t);}catch(e){}}
+function toggleTheme(){applyTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");}
+(function(){try{const t=localStorage.getItem("pinkagc_theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}})();
+/* menu ⋯ dùng chung: mở menu của nút vừa bấm, đóng các menu khác; click ngoài đóng tất cả */
+function toggleKebab(btn){const menu=btn.nextElementSibling,open=menu.classList.contains('show');
+  document.querySelectorAll('.kmenu.show').forEach(m=>m.classList.remove('show'));
+  if(!open)menu.classList.add('show');event.stopPropagation();}
+document.addEventListener('click',()=>document.querySelectorAll('.kmenu.show').forEach(m=>m.classList.remove('show')));
 
 /* ---------- sidebar ---------- */
 function renderNav(){
@@ -311,12 +409,13 @@ async function load(){
 function render(){
   const el=document.getElementById("content");
   const v=STATE.view;
-  if(v==="home"||v==="profiles") el.innerHTML=viewProfiles();
+  if(v==="home"){el.innerHTML=viewHome();loadHomeHealth();}
+  else if(v==="profiles") el.innerHTML=viewProfiles();
   else if(v==="proxy") el.innerHTML=viewProxy();
   else if(v==="trash") {el.innerHTML=viewTrash();loadTrash();}
   else if(v==="automation") el.innerHTML=viewAutomation();
   else if(v==="mcp"){el.innerHTML=viewMCP();loadMcp();}
-  else if(v==="about") el.innerHTML=viewAbout();
+  else if(v==="about"){el.innerHTML=viewAbout();loadAbout();}
   else if(v==="groups") el.innerHTML=viewGroups();
   else if(v==="extensions"){el.innerHTML=viewExtensions();loadExts();}
   else if(v==="settings"){el.innerHTML=viewSettings();loadSettings();}
@@ -326,10 +425,43 @@ function render(){
   else el.innerHTML=viewSoon(v);
 }
 
+/* ----- Trang chủ (welcome) ----- */
+const statCard=(label,val)=>`<div class="card" style="padding:18px"><div class="statl">${esc(label)}</div><div class="statn">${val}</div></div>`;
+function viewHome(){
+  const total=STATE.profiles.length, running=STATE.profiles.filter(p=>p.status==="running").length;
+  return `<div class="phead"><h1>Chào mừng đến <em>PinkAgc Browser</em></h1><p>Trình duyệt antidetect tự host — quản lý profile, fingerprint và proxy từ một chỗ.</p></div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px">
+     ${statCard("Tổng profile",total)}
+     ${statCard("Đang chạy",`<span style="color:var(--ok)">${running}</span>`)}
+     ${statCard("Nhóm",STATE.groups.length)}
+     ${statCard("Proxy",STATE.proxies.length)}
+   </div>
+   <div class="split" style="grid-template-columns:1fr 320px;align-items:start">
+     <div class="card" style="padding:24px">
+       <h3 style="margin-top:0">Bắt đầu nhanh</h3>
+       <div class="toolbar" style="margin:14px 0 0">
+         <button class="btn pri" onclick="openCreate()">${svg(I.plus)}Tạo profile</button>
+         <button class="btn" onclick="go('profiles')">${svg(I.user)}Danh sách Profile</button>
+         <button class="btn" onclick="go('proxy')">${svg(I.globe)}Proxy</button>
+         <button class="btn" onclick="go('automation')">${svg(I.bot)}Kịch bản JSON</button>
+       </div>
+       <p class="dim" style="font-size:13px;margin-top:16px;line-height:1.7">Mỗi profile một fingerprint riêng (GPU · cores · memory · font coherent theo máy thật), proxy auth-relay (http/socks5), chống rò WebRTC/DNS, auto-timezone theo IP. Lõi mở, không giới hạn số profile.</p>
+     </div>
+     <div class="card" style="padding:24px;text-align:center">
+       <img src="mascot.png" style="width:92px" onerror="this.style.display='none'">
+       <h2 style="margin:8px 0 2px;font-size:19px">Pinkagc <span style="color:var(--primary)">Browser</span></h2>
+       <p class="dim" style="font-size:12.5px;margin:2px 0 0">Antidetect · open-core</p>
+       <div id="homeHealth" class="dim" style="margin-top:14px;font-size:12.5px">Đang kiểm tra engine...</div>
+     </div>
+   </div>`;
+}
+async function loadHomeHealth(){try{const d=await j(`${API}/health`);const el=document.getElementById("homeHealth");if(el)el.innerHTML=`<span class="dot ok"></span> ${esc(d.app)} · ${d.running.length} đang chạy<br><span style="font-size:11px">engine: ${esc((d.engines||[]).join(", "))}</span>`;}catch(e){const el=document.getElementById("homeHealth");if(el)el.innerHTML='<span class="dot err"></span> Không kết nối backend';}}
+
 /* ----- Profiles ----- */
 function viewProfiles(){
-  const gf=STATE.gf||"", tf=STATE.tf||"", q=(STATE.q||"").toLowerCase();
-  const list=STATE.profiles.filter(p=>(!gf||p.group_id===gf)&&(!tf||(p.tags||[]).includes(tf))&&(!q||(p.name||"").toLowerCase().includes(q)));
+  const gf=STATE.gf||"", tf=STATE.tf||"", sf=STATE.sf||"", q=(STATE.q||"").toLowerCase();
+  const gmap=Object.fromEntries(STATE.groups.map(g=>[g.id,g.name]));
+  const list=STATE.profiles.filter(p=>(!gf||p.group_id===gf)&&(!tf||(p.tags||[]).includes(tf))&&(!sf||(p.status||"stopped")===sf)&&(!q||(p.name||"").toLowerCase().includes(q)));
   const total=list.length, perPage=STATE.perPage||30, pages=Math.max(1,Math.ceil(total/perPage));
   const page=Math.min(STATE.page||1,pages), paged=list.slice((page-1)*perPage,page*perPage);
   const rows=paged.length? paged.map(p=>{
@@ -338,7 +470,8 @@ function viewProfiles(){
     const eng=p.engine==="camoufox"?'<span class="tag ff">firefox</span>':p.engine==="botbrowser"?'<span class="tag cr">chromium</span>':`<span class="tag">${esc(p.engine||'auto')}</span>`;
     return `<tr data-name="${esc((p.name||'').toLowerCase())}">
       <td><input type="checkbox" class="chk rowchk" value="${p.id}" ${STATE.sel.has(p.id)?'checked':''} onchange="onSel('${p.id}',this.checked)"></td>
-      <td><b>${p.pinned?'📌 ':''}${dot}${esc(p.name)}</b>${p.note?` <span class="dim" title="${esc(p.note)}">✎</span>`:''}</td>
+      <td><div class="pcell"><b>${p.pinned?'📌 ':''}${dot}${esc(p.name)}</b>${p.note?` <span class="dim" title="${esc(p.note)}">✎</span>`:''}<div class="psub">${esc(p.browser||'—')} · ${esc(p.os||'—')}</div></div></td>
+      <td>${p.group_id&&gmap[p.group_id]?`<span class="gchip">${esc(gmap[p.group_id])}</span>`:'<span class="dim">—</span>'}</td>
       <td class="dim c-os">${esc(p.os||'—')}</td>
       <td class="dim c-browser">${esc(p.browser||'—')}</td>
       <td class="c-engine">${eng}</td>
@@ -350,13 +483,19 @@ function viewProfiles(){
       <td><div class="rowact">
         ${run?`<button class="btn sm ghost-pink" onclick="act('stop/${p.id}','Đã đóng')">${svg(I.stop)}Dừng</button>`
              :`<button class="btn sm pri" onclick="startP('${p.id}')">${svg(I.play)}Mở</button>`}
-        <button class="btn sm" onclick="openProxy('${p.id}')">Proxy</button>
-        <button class="btn sm" onclick="cloneP('${p.id}')" title="Nhân bản">${svg(I.copy)}</button>
-        <button class="btn sm" onclick="randP('${p.id}')" title="Random fingerprint">${svg(I.shuffle)}</button>
-        <button class="btn sm" onclick="editP('${p.id}')" title="Sửa">✎</button>
-        <button class="btn sm" onclick="delP('${p.id}','${esc(p.name)}')" title="Xoá">🗑</button>
+        <button class="btn sm" onclick="editP('${p.id}')" title="Sửa">✎ Sửa</button>
+        <div class="kebab">
+          <button class="btn sm" onclick="toggleKebab(this)" title="Thêm thao tác">${svg(I.dots)}</button>
+          <div class="kmenu">
+            <button onclick="openProxy('${p.id}')">${svg(I.globe)} Gán proxy</button>
+            <button onclick="cloneP('${p.id}')">${svg(I.copy)} Nhân bản</button>
+            <button onclick="randP('${p.id}')">${svg(I.shuffle)} Random fingerprint</button>
+            <div class="ksep"></div>
+            <button class="danger" onclick="delP('${p.id}','${esc(p.name)}')">${svg(I.trash)} Xoá</button>
+          </div>
+        </div>
       </div></td></tr>`;}).join("")
-    : `<tr><td colspan="11"><div class="empty"><img src="mascot.png" onerror="this.style.display='none'"><h3>Chưa có profile nào</h3><p>Bấm <b>Tạo profile</b> để bắt đầu.</p></div></td></tr>`;
+    : `<tr><td colspan="12"><div class="empty"><img src="mascot.png" onerror="this.style.display='none'"><h3>Chưa có profile nào</h3><p>Bấm <b>Tạo profile</b> để bắt đầu.</p></div></td></tr>`;
   const bulk=STATE.sel.size?`<div class="toolbar" style="background:var(--primary-soft);padding:10px 14px;border-radius:10px">
       <b>${STATE.sel.size} đã chọn</b>
       <button class="btn sm pri" onclick="bulk('start')">${svg(I.play)}Mở</button>
@@ -377,6 +516,10 @@ function viewProfiles(){
         <option value="">Tất cả nhóm</option>${STATE.groups.map(g=>`<option value="${g.id}" ${gf===g.id?'selected':''}>${esc(g.name)} (${g.count})</option>`).join("")}</select>
       <select style="width:auto" onchange="STATE.tf=this.value;render()">
         <option value="">Tất cả tag</option>${allTags().map(t=>`<option value="${esc(t)}" ${tf===t?'selected':''}>${esc(t)}</option>`).join("")}</select>
+      <select style="width:auto" onchange="STATE.sf=this.value;render()">
+        <option value="">Mọi trạng thái</option>
+        <option value="running" ${sf==='running'?'selected':''}>Đang chạy</option>
+        <option value="stopped" ${sf==='stopped'?'selected':''}>Sẵn sàng</option></select>
       <div class="grow"></div>
       <div class="search" style="width:240px">${svg(I.search)}<input id="pq" value="${esc(STATE.q||'')}" placeholder="Tìm profile..." oninput="onSearch(this.value)"></div>
       <div style="position:relative">
@@ -389,7 +532,7 @@ function viewProfiles(){
     ${bulk}
     <div class="card ${hcolClass()}" id="profCard"><table>
       <thead><tr><th style="width:36px"><input type="checkbox" class="chk" onchange="toggleAll(this.checked)"></th>
-        <th>Tên</th><th class="c-os">OS</th><th class="c-browser">Browser</th><th class="c-engine">Engine</th><th>Proxy</th><th class="c-tz">Timezone</th><th>Trạng thái</th><th class="c-lastrun">Lần chạy cuối</th><th class="c-tags">Tags</th><th style="text-align:right">Thao tác</th></tr></thead>
+        <th>Tên</th><th>Nhóm</th><th class="c-os">OS</th><th class="c-browser">Browser</th><th class="c-engine">Engine</th><th>Proxy</th><th class="c-tz">Timezone</th><th>Trạng thái</th><th class="c-lastrun">Lần chạy cuối</th><th class="c-tags">Tags</th><th style="text-align:right">Thao tác</th></tr></thead>
       <tbody id="profTbody">${rows}</tbody></table>
       <div class="pager2">
         <button onclick="gotoPage(${page-1})" ${page<=1?'disabled':''}>‹</button>
@@ -427,7 +570,7 @@ function viewProxy(){
     <div class="card"><table>
       <thead><tr><th style="width:36px"></th><th>IP:Port</th><th>Quốc gia / Exit IP</th><th>Loại</th><th>Độ trễ</th><th>Trạng thái</th><th style="text-align:right">Thao tác</th></tr></thead>
       <tbody>${rows}</tbody></table>
-      <div class="pager"><span></span><span>Tổng số ${list.length}</span></div></div>`;
+      <div class="pager2"><div class="grow"></div><span>Tổng số <b>${list.length}</b> proxy</span></div></div>`;
 }
 
 /* ----- Trash ----- */
@@ -436,23 +579,93 @@ function viewTrash(){return `<div class="phead"><h1>Thùng <em>rác</em></h1><p>
 async function loadTrash(){try{const l=await j(`${API}/profiles/trash`);document.getElementById("trashBody").innerHTML=l.length?l.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${proxyBadge(p.proxy)}</td><td class="dim">${fmtAgo(p.last_run_at)}</td><td><div class="rowact"><button class="btn sm pri" onclick="act('${p.id}/restore','Đã khôi phục',loadTrash)">${svg(I.shuffle)}Khôi phục</button><button class="btn sm" onclick="purge('${p.id}','${esc(p.name)}')">🗑 Xoá vĩnh viễn</button></div></td></tr>`).join(""):`<tr><td colspan="4"><div class="empty"><img src="mascot.png" onerror="this.style.display='none'"><h3>Thùng rác trống</h3><p>Không có dữ liệu để hiển thị.</p></div></td></tr>`;}catch(e){}}
 
 /* ----- Automation ----- */
+/* Trình dựng no-code: mỗi action + field tương ứng */
+const AU_ACTIONS={
+  goto:{label:"Mở URL",f:[["url","URL","https://ip8.com"]]},
+  click:{label:"Click",f:[["selector","Selector","#btn"]]},
+  type:{label:"Gõ chữ",f:[["selector","Selector","#email"],["text","Nội dung","abc"]]},
+  fill:{label:"Điền ô",f:[["selector","Selector","#email"],["text","Giá trị",""]]},
+  wait:{label:"Chờ (ms)",f:[["ms","Mili-giây","2000"]]},
+  waitfor:{label:"Chờ phần tử",f:[["selector","Selector","#el"]]},
+  press:{label:"Nhấn phím",f:[["key","Phím (Enter/Tab...)","Enter"]]},
+  scroll:{label:"Cuộn",f:[["y","Px (trống = cuối trang)",""]]},
+  screenshot:{label:"Chụp màn",f:[["path","Tên file","shot.png"]]},
+  eval:{label:"Chạy JS",f:[["expression","Biểu thức JS","document.title"]]},
+  extract:{label:"Trích text",f:[["selector","Selector","body"],["as","Lưu vào biến","out"]]},
+  image_click:{label:"Click theo ảnh",f:[["path","Ảnh mẫu (OpenCV)","btn.png"]]},
+};
+function auInitSteps(){if(STATE.autoSteps===undefined){try{STATE.autoSteps=JSON.parse(STATE.autoScript||"");}catch(e){STATE.autoSteps=[{action:"goto",url:"https://ip8.com"},{action:"wait",ms:2000},{action:"screenshot",path:"shot.png"}];}}}
+function auStepsClean(){return (STATE.autoSteps||[]).map(s=>{const o={action:s.action};for(const k in s){if(k==="action")continue;let v=s[k];if((k==="ms"||k==="y")&&v!=="")v=Number(v);if(v!==""&&v!=null)o[k]=v;}return o;});}
+function auGetSteps(){return (STATE.autoMode||"build")==="json"?JSON.parse(val("auJson")):auStepsClean();}
+function auBuilder(){const steps=STATE.autoSteps||[];
+  return steps.length?steps.map((s,i)=>{const def=AU_ACTIONS[s.action]||AU_ACTIONS.goto;
+    return `<div class="austep"><span class="auno">${i+1}</span>
+      <select onchange="auSetAction(${i},this.value)">${Object.entries(AU_ACTIONS).map(([k,v])=>`<option value="${k}" ${s.action===k?'selected':''}>${v.label}</option>`).join("")}</select>
+      ${def.f.map(([key,lbl])=>`<input placeholder="${esc(lbl)}" value="${esc(s[key]==null?'':s[key])}" oninput="auSetField(${i},'${key}',this.value)">`).join("")}
+      <span class="gp"><button class="btn sm" onclick="auMove(${i},-1)" title="Lên">↑</button><button class="btn sm" onclick="auMove(${i},1)" title="Xuống">↓</button><button class="btn sm" onclick="auDel(${i})" title="Xoá">🗑</button></span>
+    </div>`;}).join(""):'<p class="dim" style="padding:8px 0">Chưa có bước nào — bấm <b>Thêm bước</b> để dựng kịch bản.</p>';}
+function auRerender(){const el=document.getElementById("auSteps");if(el)el.innerHTML=auBuilder();}
+function auAddStep(){auInitSteps();STATE.autoSteps.push({action:"goto",url:""});auRerender();}
+function auSetAction(i,a){STATE.autoSteps[i]={action:a};auRerender();}
+function auSetField(i,k,v){STATE.autoSteps[i][k]=v;}
+function auDel(i){STATE.autoSteps.splice(i,1);auRerender();}
+function auMove(i,d){const a=STATE.autoSteps,j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];auRerender();}
+function auMode(m){if(m==="build"){try{STATE.autoSteps=JSON.parse(val("auJson"));}catch(e){}}STATE.autoMode=m;render();}
 function viewAutomation(){const opts=STATE.profiles.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("");
-  return `<div class="phead"><h1>Automation <em>no-code</em></h1><p>Chạy kịch bản (list step JSON) trên một profile qua CDP.</p></div>
-  <div class="split" style="grid-template-columns:1fr 330px">
+  auInitSteps();const mode=STATE.autoMode||"build";
+  return `<div class="phead"><h1>Kịch <em>bản</em></h1><p>Dựng kịch bản automation không cần code (hoặc chỉnh JSON thô), chạy trên một profile qua CDP.</p></div>
+  <div class="split" style="grid-template-columns:1fr 300px">
    <div class="card" style="padding:20px">
-    <div class="field"><label>Profile</label><select id="auProf">${opts||'<option>— chưa có profile —</option>'}</select></div>
-    <div class="field"><label>Kịch bản (JSON steps)</label>
-      <textarea id="auJson" rows="12" class="mono" style="resize:vertical">${esc(STATE.autoScript||'[\n  {"action":"goto","url":"https://ip8.com"},\n  {"action":"wait","ms":2000},\n  {"action":"screenshot","path":"shot.png"}\n]')}</textarea></div>
-    <div class="toolbar"><button class="btn" onclick="auValidate()">${svg(I.check)}Kiểm tra cú pháp</button>
-      <button class="btn pri" onclick="auRun()">${svg(I.play)}Chạy</button></div>
+    <div class="inline" style="justify-content:space-between;margin-bottom:14px">
+      <div style="flex:1;max-width:340px"><label>Profile</label><select id="auProf">${opts||'<option>— chưa có profile —</option>'}</select></div>
+      <div class="seg" style="align-self:flex-end"><button class="${mode==='build'?'on':''}" onclick="auMode('build')">Trình dựng</button><button class="${mode==='json'?'on':''}" onclick="auMode('json')">JSON</button></div>
+    </div>
+    ${mode==='build'?`<div id="auSteps">${auBuilder()}</div>
+      <button class="btn" style="margin-top:6px" onclick="auAddStep()">${svg(I.plus)}Thêm bước</button>`
+     :`<textarea id="auJson" rows="15" class="mono" style="resize:vertical">${esc(JSON.stringify(auStepsClean(),null,2))}</textarea>`}
+    <div class="toolbar" style="margin-top:16px"><button class="btn" onclick="auValidate()">${svg(I.check)}Kiểm tra</button>
+      <button class="btn pri" id="auRunBtn" onclick="auRun()">${svg(I.play)}Chạy (1 profile)</button>
+      <button class="btn" onclick="auRunAll()" title="Đồng bộ: chạy kịch bản này trên MỌI profile đang chạy cùng lúc">${svg(I.copy)}Chạy đồng bộ (${STATE.profiles.filter(p=>p.status==='running').length} đang mở)</button>
+      <button class="btn ghost-pink" id="auStopBtn" onclick="auStop()" style="display:none">${svg(I.stop)}Dừng</button></div>
    </div>
-   <div><div class="summary"><b>Action hỗ trợ</b>
-     <div style="margin-top:10px;line-height:1.9;font-size:13px" class="dim">goto · click · type · fill · wait · waitfor · press · scroll · screenshot · eval · extract · image_click</div></div>
-     <div class="hint">Mở headless, chạy xong tự đóng (nếu profile chưa mở). <code>type</code> gõ thật, <code>image_click</code> dùng OpenCV.</div>
-     <pre id="auOut" class="mono" style="margin-top:14px;background:#fbf6fa;border:1px solid var(--line);border-radius:12px;padding:14px;max-height:280px;overflow:auto;white-space:pre-wrap;font-size:12px"></pre></div>
+   <div><div class="summary"><b>12 action hỗ trợ</b>
+     <div style="margin-top:10px;line-height:1.9;font-size:13px" class="dim">${Object.values(AU_ACTIONS).map(a=>esc(a.label)).join(" · ")}</div></div>
+     <div class="hint">Mở headless, chạy xong tự đóng (nếu profile chưa mở). <code>Gõ chữ</code> gõ thật, <code>Click theo ảnh</code> dùng OpenCV. "Trình dựng" và "JSON" đồng bộ hai chiều.</div></div>
+  </div>
+  <div class="card" style="padding:16px 20px;margin-top:16px">
+    <div class="inline" style="justify-content:space-between"><b>Kết quả</b><span id="auStatus" class="dim" style="font-size:13px">Chưa chạy</span></div>
+    <pre id="auOut" class="mono" style="margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;max-height:320px;overflow:auto;white-space:pre-wrap;font-size:12px"></pre>
   </div>`;}
-async function auValidate(){try{const steps=JSON.parse(document.getElementById("auJson").value);const d=await j(`${API}/automation/validate`,body({steps}));document.getElementById("auOut").textContent=d.valid?"✓ Cú pháp hợp lệ":"✗ Lỗi:\n"+d.errors.join("\n");}catch(e){document.getElementById("auOut").textContent="JSON lỗi: "+e.message;}}
-async function auRun(){const id=document.getElementById("auProf").value;let steps;try{steps=JSON.parse(document.getElementById("auJson").value);}catch(e){return toast("JSON lỗi","err");}const o=document.getElementById("auOut");o.textContent="Đang chạy...";try{const d=await j(`${API}/profiles/${id}/run`,body({steps,headless:true}));o.textContent="ok="+d.ok+"\n"+(d.log||[]).join("\n")+"\n\ndata="+JSON.stringify(d.data,null,2);toast(d.ok?"Chạy xong":"Có lỗi khi chạy",d.ok?"ok":"err");}catch(e){o.textContent=e.message;toast(e.message,"err");}}
+async function auValidate(){let steps;try{steps=auGetSteps();}catch(e){return document.getElementById("auOut").textContent="JSON lỗi: "+e.message;}
+  try{const d=await j(`${API}/automation/validate`,body({steps}));document.getElementById("auOut").textContent=d.valid?"✓ Cú pháp hợp lệ ("+steps.length+" bước)":"✗ Lỗi:\n"+d.errors.join("\n");document.getElementById("auStatus").textContent=d.valid?"Hợp lệ":"Cú pháp lỗi";}catch(e){document.getElementById("auOut").textContent=e.message;}}
+let AUABORT=null;
+function auSetRunning(on){const r=document.getElementById("auRunBtn"),s=document.getElementById("auStopBtn");if(r)r.style.display=on?'none':'';if(s)s.style.display=on?'':'none';}
+function auStop(){if(AUABORT)AUABORT.abort();}
+/* Đồng bộ thao tác: chạy cùng 1 kịch bản trên MỌI profile đang chạy, song song */
+async function auRunAll(){let steps;try{steps=auGetSteps();}catch(e){return toast("JSON lỗi","err");}
+  if(!steps||!steps.length)return toast("Chưa có bước nào","");
+  const ids=STATE.profiles.filter(p=>p.status==="running").map(p=>p.id);
+  if(!ids.length)return toast("Không có profile nào đang chạy — mở vài profile trước","err");
+  if(!confirm(`Chạy kịch bản (${steps.length} bước) ĐỒNG THỜI trên ${ids.length} profile đang mở?`))return;
+  const o=document.getElementById("auOut"),st=document.getElementById("auStatus");
+  auSetRunning(true);st.innerHTML=`<span class="dot ok"></span> Đồng bộ trên ${ids.length} profile...`;o.textContent="";
+  const res=await Promise.all(ids.map(async id=>{try{const d=await j(`${API}/profiles/${id}/run`,body({steps,headless:false}));return {id,ok:d.ok};}catch(e){return {id,ok:false,err:e.message};}}));
+  const okN=res.filter(r=>r.ok).length;
+  o.textContent=res.map(r=>`${r.ok?'✓':'✗'} ${r.id.slice(0,8)}${r.err?' — '+r.err:''}`).join("\n");
+  st.innerHTML=`<span style="color:${okN===ids.length?'var(--ok)':'var(--warn)'}">● ${okN}/${ids.length} xong</span>`;
+  auSetRunning(false);toast(`Đồng bộ: ${okN}/${ids.length} profile xong`,okN?"ok":"err");}
+async function auRun(){const id=document.getElementById("auProf").value;let steps;try{steps=auGetSteps();}catch(e){return toast("JSON lỗi","err");}
+  if(!steps||!steps.length)return toast("Chưa có bước nào","");
+  const o=document.getElementById("auOut"),st=document.getElementById("auStatus");
+  auSetRunning(true);st.innerHTML='<span class="dot ok"></span> Đang chạy...';o.textContent="";AUABORT=new AbortController();
+  try{const r=await fetch(`${API}/profiles/${id}/run`,{...body({steps,headless:true}),signal:AUABORT.signal});
+    const d=await r.json();if(!d.success)throw new Error(d.message||"Lỗi");const dd=d.data;
+    o.textContent="ok="+dd.ok+"\n"+(dd.log||[]).join("\n")+"\n\ndata="+JSON.stringify(dd.data,null,2);
+    st.innerHTML=dd.ok?'<span style="color:var(--ok)">● Xong</span>':'<span style="color:var(--err)">● Có lỗi</span>';
+    toast(dd.ok?"Chạy xong":"Có lỗi khi chạy",dd.ok?"ok":"err");
+  }catch(e){if(e.name==="AbortError"){o.textContent="Đã huỷ chờ kết quả (tiến trình trên máy có thể vẫn chạy tới khi xong).";st.innerHTML='<span class="dim">● Đã huỷ chờ</span>';}
+    else{o.textContent=e.message;st.innerHTML='<span style="color:var(--err)">● Lỗi</span>';toast(e.message,"err");}}
+  finally{auSetRunning(false);AUABORT=null;}}
 
 /* ----- MCP (chi tiết: kết nối AI agent) ----- */
 function cp(txt,btn){navigator.clipboard.writeText(txt).then(()=>{if(btn){const o=btn.textContent;btn.textContent="✓ Đã copy";setTimeout(()=>btn.textContent=o,1400);}toast("Đã copy","ok");}).catch(()=>toast("Copy lỗi — bôi đen tay","err"));}
@@ -461,12 +674,14 @@ function codeBlock(id,label){return `<div style="position:relative"><label style
 function viewMCP(){return `<div class="phead"><h1>MCP cho <em>AI agent</em></h1><p>Cho phép AI agent (Claude, Cursor...) quản lý profile qua giao thức MCP.</p></div>
  <div class="split" style="grid-template-columns:1.3fr 1fr">
   <div class="card" style="padding:22px">
-   <h3 style="margin-top:0">1. Kết nối client (Claude Code)</h3>
+   <h3 class="steph" style="margin-top:0"><span class="stepn">1</span>Kết nối client (Claude Code)</h3>
    <p class="dim" style="font-size:13px">Chạy 1 lệnh để đăng ký MCP server vào Claude Code:</p>
    ${codeBlock("mcpAdd","Lệnh claude mcp add")}
-   <h3>2. Hoặc dán config thủ công</h3>
+   <h3 class="steph" style="margin-top:20px"><span class="stepn">2</span>Hoặc dán config thủ công</h3>
    <p class="dim" style="font-size:13px">Claude Desktop / Cursor: dán vào <code>mcpServers</code> trong file config (đã điền sẵn đường dẫn Python + env của máy bạn):</p>
    ${codeBlock("mcpCfg","Config JSON")}
+   <h3 class="steph" style="margin-top:20px"><span class="stepn">3</span>Thử trong agent</h3>
+   <p class="dim" style="font-size:13px">Mở agent rồi hỏi <i>"liệt kê profile"</i> — agent gọi tool <code>list_profiles</code>. Có danh sách trả về là đã kết nối.</p>
    <div class="hint" style="margin-top:14px">MCP chạy <b>stdio cục bộ</b> — không mở cổng mạng, <b>không cần token</b> (khác GPM dùng HTTP). Agent khởi chạy tiến trình trực tiếp nên an toàn mặc định.</div>
   </div>
   <div class="card" style="padding:22px"><h3 style="margin-top:0">Tool khả dụng</h3>
@@ -491,8 +706,15 @@ function viewAbout(){return `<div class="phead"><h1>Giới <em>thiệu</em></h1>
   <h2 style="margin:10px 0 2px">Pinkagc <span style="color:var(--primary)">Browser</span></h2>
   <p class="dim">Antidetect browser manager · lõi mở (ovobrowser/Camoufox)</p>
   <p style="font-size:13px" class="dim">GPU spoof per-profile · coherent combo · chống rò WebRTC/DNS · auto-timezone · auth-relay socks5.</p>
+  <div id="verLine" class="dim" style="margin-top:12px;font-size:13px">Phiên bản: <b id="appVer">…</b></div>
+  <button class="btn sm" style="margin-top:8px" onclick="checkUpdate(this)">${svg(I.up)}Kiểm tra cập nhật</button>
+  <div id="updLine" class="dim" style="margin-top:8px;font-size:12.5px"></div>
   <div id="healthLine" class="dim" style="margin-top:14px;font-size:13px">Đang kiểm tra engine...</div></div>`;}
+async function checkUpdate(btn){const u=document.getElementById("updLine");u.textContent="Đang kiểm tra...";try{const d=await j(`${API}/check-update`);
+  if(d.has_update)u.innerHTML=`<span style="color:var(--primary);font-weight:700">● Có bản mới ${esc(d.latest)}</span>${d.url?` — <a href="${esc(d.url)}" target="_blank">Tải</a>`:''}${d.notes?`<br><span class="dim">${esc(d.notes)}</span>`:''}`;
+  else u.innerHTML=`<span style="color:var(--ok)">● Đang dùng bản mới nhất</span>${d.reason?` <span class="dim">(${esc(d.reason)})</span>`:''}`;}catch(e){u.textContent=e.message;}}
 async function loadHealth(){try{const d=await j(`${API}/health`);document.getElementById("healthLine")&&(document.getElementById("healthLine").innerHTML=`<span class="dot ok"></span> ${esc(d.app)} · engine: ${d.engines.join(", ")} · đang chạy: ${d.running.length}`);}catch(e){}}
+async function loadAbout(){try{const v=await j(`${API}/version`);const e=document.getElementById("appVer");if(e)e.textContent="v"+v.version;}catch(e){}loadHealth();}
 
 /* ----- Groups ----- */
 function viewGroups(){
@@ -508,7 +730,8 @@ function viewGroups(){
      <input id="gName" placeholder="Tên nhóm" style="flex:1" onkeydown="if(event.key==='Enter')addGroup()">
      <button class="btn pri" onclick="addGroup()">${svg(I.plus)}Thêm mới</button>
      <button class="btn" onclick="refresh()" title="Làm mới">${svg(I.globe)}</button></div>
-   <div class="card"><table><thead><tr><th>Tên nhóm</th><th>Số profile</th><th style="text-align:right">Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+   <div class="card"><table><thead><tr><th>Tên nhóm</th><th>Số profile</th><th style="text-align:right">Thao tác</th></tr></thead><tbody>${rows}</tbody></table>
+     <div class="pager2"><div class="grow"></div><span>Tổng số <b>${STATE.groups.length}</b> nhóm</span></div></div>`;
 }
 async function addGroup(){const e=document.getElementById("gName");const n=(e?e.value:"").trim();if(!n)return toast("Nhập tên nhóm","");try{await j(`${API}/groups`,body({name:n}));toast("Đã tạo nhóm","ok");refresh();}catch(err){toast(err.message,"err");}}
 async function renameGroup(id,old){const n=prompt("Đổi tên nhóm:",old);if(!n||n===old)return;try{await j(`${API}/groups/${id}`,body({name:n.trim()}));toast("Đã đổi tên","ok");refresh();}catch(e){toast(e.message,"err");}}
@@ -522,10 +745,11 @@ function viewExtensions(){
      <label style="margin:0">Profile:</label>
      <select id="extProf" style="width:240px" onchange="loadExts()">${opts||'<option>— chưa có profile —</option>'}</select>
      <button class="btn pri" onclick="addExt()">${svg(I.plus)}Thêm extension</button>
+     <span class="dim" style="font-size:12.5px;margin-left:auto">Extension áp dụng ở <b>lần mở profile tiếp theo</b>.</span>
    </div>
-   <div class="card"><table><thead><tr><th>Đường dẫn extension</th><th style="text-align:right">Thao tác</th></tr></thead><tbody id="extBody"><tr><td colspan="2" class="dim" style="padding:22px">Chọn profile để xem.</td></tr></tbody></table></div>`;
+   <div class="card"><table><thead><tr><th>Extension</th><th style="text-align:right">Thao tác</th></tr></thead><tbody id="extBody"><tr><td colspan="2" class="dim" style="padding:22px">Chọn profile để xem.</td></tr></tbody></table></div>`;
 }
-async function loadExts(){const id=document.getElementById("extProf")?.value;if(!id)return;try{const l=await j(`${API}/profiles/${id}/extensions`);document.getElementById("extBody").innerHTML=l.length?l.map(p=>`<tr><td class="mono">${esc(p)}</td><td><div class="rowact"><button class="btn sm" onclick="delExt('${id}','${encodeURIComponent(p)}')">🗑</button></div></td></tr>`).join(""):`<tr><td colspan="2" class="dim" style="padding:22px">Chưa có extension. Bấm <b>Thêm extension</b>.</td></tr>`;}catch(e){toast(e.message,"err");}}
+async function loadExts(){const id=document.getElementById("extProf")?.value;if(!id)return;try{const l=await j(`${API}/profiles/${id}/extensions`);document.getElementById("extBody").innerHTML=l.length?l.map(p=>{const nm=String(p).replace(/[\\/]+$/,"").split(/[\\/]/).pop()||p;return `<tr><td><div class="pcell"><b>${esc(nm)}</b><div class="psub mono" title="${esc(p)}">${esc(p)}</div></div></td><td><div class="rowact"><button class="btn sm" onclick="delExt('${id}','${encodeURIComponent(p)}')" title="Gỡ">🗑</button></div></td></tr>`;}).join(""):`<tr><td colspan="2" class="dim" style="padding:22px">Chưa có extension. Bấm <b>Thêm extension</b>.</td></tr>`;}catch(e){toast(e.message,"err");}}
 async function addExt(){const id=document.getElementById("extProf")?.value;if(!id)return toast("Chưa có profile","err");const path=prompt("Đường dẫn thư mục extension (đã giải nén / unpacked):");if(!path)return;try{await j(`${API}/profiles/${id}/extensions`,body({path:path.trim()}));toast("Đã thêm extension (áp dụng lần Mở tới)","ok");loadExts();}catch(e){toast(e.message,"err");}}
 async function delExt(id,p){try{await j(`${API}/profiles/${id}/extensions?path=${p}`,{method:"DELETE"});toast("Đã gỡ");loadExts();}catch(e){toast(e.message,"err");}}
 
@@ -566,6 +790,7 @@ async function loadSettings(){
    <div class="tabpanel" data-tp="trinhduyet" style="display:none"><div class="split" style="grid-template-columns:1fr 1fr">
      <div class="card" style="padding:22px">
        <h3 style="margin-top:0">Browser trigger</h3>
+       <p class="dim" style="font-size:13px;margin:0 0 14px">Hành vi khi mở trình duyệt: cache, kích thước cửa sổ, URL và tham số khởi động.</p>
        <div class="checkline"><label class="toggle"><input id="sCache" type="checkbox" ${s.clear_cache?'checked':''}><span></span></label> Xoá cache tự động</div>
        <div class="checkline"><label class="toggle"><input id="sWin" type="checkbox" ${s.limit_window?'checked':''}><span></span></label> Giới hạn kích thước cửa sổ theo cài đặt</div>
        <div class="field" style="margin-top:12px"><label>URL khởi động (cách nhau bằng dấu cách)</label><input id="sUrl" value="${esc(s.start_url||'')}" placeholder="https://google.com https://facebook.com"></div>
@@ -573,6 +798,7 @@ async function loadSettings(){
      </div>
      <div class="card" style="padding:22px">
        <h3 style="margin-top:0">Fingerprint mặc định</h3>
+       <p class="dim" style="font-size:13px;margin:0 0 14px">Chế độ chống phát hiện áp cho profile tạo mới. <b>Noise/Masked</b> = mỗi profile vân tay riêng.</p>
        ${sr("canvas","Canvas","Noise","Real")}
        ${sr("client_rect","Client rect","Noise","Real")}
        ${sr("webgl","WebGL image","Noise","Real")}
@@ -606,11 +832,18 @@ async function saveSettings(){
 
 /* ----- Log ----- */
 function viewLog(){return `<div class="phead"><h1>Nhật <em>ký</em></h1><p>Hoạt động gần đây trong phiên (tạo/mở/đóng profile...).</p></div>
- <div class="toolbar"><button class="btn" onclick="loadLog()">${svg(I.globe)}Làm mới</button></div>
- <div class="card"><table><thead><tr><th style="width:170px">Thời gian</th><th style="width:90px">Loại</th><th>Nội dung</th></tr></thead><tbody id="logBody"><tr><td colspan="3" class="dim" style="padding:22px">Đang tải...</td></tr></tbody></table></div>`;}
-async function loadLog(){try{const l=await j(`${API}/log`);const kc={start:"ok",create:"",stop:"",settings:""};
-  document.getElementById("logBody").innerHTML=l.length?l.map(e=>`<tr><td class="dim mono" style="font-size:12px">${esc(new Date(e.ts).toLocaleString())}</td><td><span class="tag">${esc(e.kind)}</span></td><td>${esc(e.msg)}</td></tr>`).join(""):`<tr><td colspan="3" class="dim" style="padding:22px">Chưa có hoạt động.</td></tr>`;
-}catch(e){toast(e.message,"err");}}
+ <div class="toolbar">
+   <div class="search" style="width:260px">${svg(I.search)}<input id="logQ" placeholder="Tìm nội dung..." oninput="renderLogRows()"></div>
+   <select id="logKind" style="width:auto" onchange="renderLogRows()">
+     <option value="">Mọi loại</option><option value="create">create</option><option value="start">start</option>
+     <option value="stop">stop</option><option value="delete">delete</option><option value="settings">settings</option></select>
+   <div class="grow"></div><button class="btn" onclick="loadLog()">${svg(I.globe)}Làm mới</button></div>
+ <div class="card"><table><thead><tr><th style="width:180px">Thời gian</th><th style="width:100px">Loại</th><th>Nội dung</th></tr></thead><tbody id="logBody"><tr><td colspan="3" class="dim" style="padding:22px">Đang tải...</td></tr></tbody></table></div>`;}
+async function loadLog(){try{STATE.logs=await j(`${API}/log`);renderLogRows();}catch(e){toast(e.message,"err");}}
+function renderLogRows(){const q=(val("logQ")||"").toLowerCase(),k=val("logKind");
+  const l=(STATE.logs||[]).filter(e=>(!k||e.kind===k)&&(!q||(''+e.msg).toLowerCase().includes(q)));
+  const b=document.getElementById("logBody");if(!b)return;
+  b.innerHTML=l.length?l.map(e=>`<tr><td class="dim mono" style="font-size:12px">${esc(new Date(e.ts).toLocaleString())}</td><td><span class="tag">${esc(e.kind)}</span></td><td>${esc(e.msg)}</td></tr>`).join(""):`<tr><td colspan="3" class="dim" style="padding:22px">${(STATE.logs&&STATE.logs.length)?'Không có kết quả khớp bộ lọc.':'Chưa có hoạt động.'}</td></tr>`;}
 
 /* ----- Developer ----- */
 const API_DOCS=[
@@ -686,7 +919,12 @@ function viewDeveloper(){
      <p class="dim" style="font-size:13px;margin:8px 0 0">Chỉ bind <code>127.0.0.1</code> (cục bộ, không auth). Mọi response dạng <code>{success, data, message?}</code>. Ví dụ:</p>
      <pre class="mono" style="background:#1b1c26;color:#e9eaf0;border-radius:10px;padding:12px;margin:10px 0 0;overflow:auto;font-size:12.5px">curl ${location.origin}/api/v3/profiles
 curl -X POST ${location.origin}/api/v3/profiles/create -H "Content-Type: application/json" -d '{"browser":"Chrome"}'</pre></div>
-   <div class="split" style="grid-template-columns:1fr 1fr;align-items:start">${(()=>{const h=Math.ceil(API_DOCS.length/2);const L=API_DOCS.slice(0,h),R=API_DOCS.slice(h);const mk=a=>a.map(gr=>`<div class="apigrp"><h3>${svg(I[gr.icon])} ${esc(gr.g)}</h3>${gr.e.map(x=>`<div class="ep"><span class="verb ${x.m}">${x.m}</span><span class="p">${esc(x.p)}</span><span class="d">${esc(x.d)}</span></div>`).join("")}</div>`).join("");return `<div>${mk(L)}</div><div>${mk(R)}</div>`;})()}</div>`;
+   <div class="split" style="grid-template-columns:230px 1fr;align-items:start">
+     <div class="card" style="padding:8px">
+       ${API_DOCS.map((gr,i)=>`<button class="devnav ${(STATE.devCat||0)===i?'on':''}" onclick="STATE.devCat=${i};render()">${svg(I[gr.icon])} ${esc(gr.g)}<span class="n">${gr.e.length}</span></button>`).join("")}
+     </div>
+     <div class="card apigrp" style="padding:18px 22px;margin:0">${(()=>{const gr=API_DOCS[STATE.devCat||0];return `<h3>${svg(I[gr.icon])} ${esc(gr.g)}</h3>`+gr.e.map(x=>`<div class="ep"><span class="verb ${x.m}">${x.m}</span><span class="p">${esc(x.p)}</span><span class="d">${esc(x.d)}</span></div>`).join("");})()}</div>
+   </div>`;
 }
 async function exportProfiles(){try{const d=await j(`${API}/profiles/export`);const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="pinkagc-profiles.json";a.click();document.getElementById("devOut").textContent=`Đã export ${d.length} profile.`;}catch(e){toast(e.message,"err");}}
 async function importProfiles(inp){const f=inp.files[0];if(!f)return;try{const txt=await f.text();const arr=JSON.parse(txt);const d=await j(`${API}/profiles/import`,body({profiles:Array.isArray(arr)?arr:arr.profiles||[]}));const o=document.getElementById("devOut");if(o)o.textContent=`Đã import ${d.imported} profile.`;toast(`Import xong ${d.imported} profile`,"ok");refresh();}catch(e){toast("Import lỗi: "+e.message,"err");}inp.value="";}
@@ -710,7 +948,7 @@ function viewAppStore(){return `<div class="phead"><h1>App <em>store</em></h1><p
      <div class="toolbar" style="margin:0"><button class="btn sm pri" onclick="useTemplate(${i})">${svg(I.play)}Dùng</button>
        <span class="dim" style="font-size:12px">${t.steps.length} bước</span></div></div>`).join("")}
   </div>`;}
-function useTemplate(i){STATE.autoScript=JSON.stringify(TEMPLATES[i].steps,null,2);go("automation");toast("Đã nạp kịch bản — chọn profile rồi Chạy","ok");}
+function useTemplate(i){STATE.autoSteps=JSON.parse(JSON.stringify(TEMPLATES[i].steps));STATE.autoMode="build";go("automation");toast("Đã nạp kịch bản — chọn profile rồi Chạy","ok");}
 
 function viewSoon(v){const t={plugins:"Plugins"}[v]||v;
   return `<div class="phead"><h1>${esc(t)}</h1></div><div class="card"><div class="empty"><img src="mascot.png" onerror="this.style.display='none'"><h3>${esc(t)}</h3><p>Màn hình này đang được hoàn thiện.</p><span class="soon">Sắp ra mắt</span></div></div>`;}
@@ -762,14 +1000,13 @@ function show(on){document.getElementById("overlay").classList.toggle("show",on)
 function renderCreate(){
   const bro=STATE.browsers.length?STATE.browsers.map(b=>`<option value="${b.value}">${esc(b.label)} (${b.engine})</option>`).join(""):'<option value="Chrome">Chrome</option>';
   const tabs=[["nhanh","Thao tác nhanh"],["ketnoi","Kết nối"],["hardware","Hardware"],["software","Software"],["cookies","Cookies"]];
-  document.getElementById("overlay").innerHTML=`<div class="modal">
+  document.getElementById("overlay").innerHTML=`<div class="modal lg">
    <div class="mhead"><div class="ic">${svg(I.plus)}</div><h2>Tạo profile</h2><button class="x" onclick="show(false)">✕</button></div>
    <div class="mbody">
-    <div class="createtop">
-      <input id="cName" placeholder="Tên profile" value="Profile ${Math.floor(1000+Math.random()*9000)}">
+    <div class="createtop" style="grid-template-columns:1fr 1fr auto">
+      <div><input id="cName" placeholder="Tên profile" value="Profile ${Math.floor(1000+Math.random()*9000)}"><div id="cNameErr" class="ferr">Nhập tên profile</div></div>
       <select id="cGroup"><option value="">Default group</option>${STATE.groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join("")}</select>
       <button class="btn" onclick="randPreview()">${svg(I.shuffle)}Thông số ngẫu nhiên</button>
-      <button class="btn pri" onclick="doCreate()">Thêm mới</button>
     </div>
     <div class="tabs">${tabs.map(t=>`<button data-tt="${t[0]}" class="${CT.tab===t[0]?'on':''}" onclick="switchTab('${t[0]}')">${t[1]}</button>`).join("")}</div>
     <div class="split">
@@ -777,7 +1014,8 @@ function renderCreate(){
       <div><div class="summary" id="cSum"></div>
         <div class="hint">Mặc định đã tối ưu sẵn: <b>fingerprint coherent + GPU thật per-profile</b>, canvas/webgl/audio/font noise, chống rò WebRTC/DNS. Chỉnh tay ở các tab nếu cần.</div></div>
     </div>
-   </div></div>`;
+   </div>
+   <div class="mfoot"><button class="btn" onclick="show(false)">Huỷ</button><button class="btn pri" onclick="doCreate()">${svg(I.plus)}Tạo profile</button></div></div>`;
   updateSum();
 }
 function switchTab(t){CT.tab=t;
@@ -786,14 +1024,27 @@ function switchTab(t){CT.tab=t;
 function createTab(bro){
   const P=(id,html)=>`<div class="tabpanel" data-tp="${id}" style="display:${CT.tab===id?'block':'none'}">${html}</div>`;
   return P("nhanh",`
-    <div class="field"><label>Số lượng profile (tạo hàng loạt)</label><input id="cCount" type="number" min="1" max="200" value="1"></div>
-    <div class="field"><label>Trình duyệt</label><select id="cBrowser" onchange="updateSum()">${bro}</select></div>
-    <div class="field"><label>OS</label><select id="cOs" onchange="updateSum()"><option>Windows</option><option>macOS</option><option>Linux</option></select></div>
-    <div class="field"><label>Engine</label><select id="cEngine"><option value="">auto (Chromium→ovobrowser)</option><option value="ovobrowser">ovobrowser (Chrome, khuyến nghị)</option><option value="camoufox">camoufox (Firefox)</option><option value="fpchromium">fpchromium</option><option value="botbrowser">botbrowser (premium)</option></select></div>
+    <div class="inline" style="gap:14px;margin-bottom:16px">
+      <div style="width:150px"><label>Số lượng</label><input id="cCount" type="number" min="1" max="200" value="1" oninput="updateSum()"></div>
+      <div style="width:120px"><label>Số bắt đầu</label><input id="cStart" type="number" min="1" value="1"></div>
+      <div style="flex:1"><label>Quy tắc đặt tên <span class="dim" style="font-weight:400">· dùng <code>{n}</code> để đánh số</span></label><input id="cNameRule" placeholder="VD: Via US {n}" value=""></div>
+    </div>
+    <div class="inline" style="gap:14px">
+      <div style="flex:1"><label>Trình duyệt</label><select id="cBrowser" onchange="updateSum()">${bro}</select></div>
+      <div style="flex:1"><label>OS</label><select id="cOs" onchange="updateSum()"><option>Windows</option><option>macOS</option><option>Linux</option></select></div>
+    </div>
+    <div class="field" style="margin-top:16px"><label>Engine</label><select id="cEngine"><option value="">auto (Chromium→ovobrowser)</option><option value="ovobrowser">ovobrowser (Chrome, khuyến nghị)</option><option value="camoufox">camoufox (Firefox)</option><option value="fpchromium">fpchromium</option><option value="botbrowser">botbrowser (premium)</option></select></div>
     <div class="field"><label>URL khởi động</label><input id="cUrl" placeholder="https://example.com"></div>
     <div class="field"><label>Proxy <a style="float:right;color:var(--primary);font-weight:700;cursor:pointer" onclick="useLibPrx()">Chọn từ thư viện</a></label>
       <input id="cProxy" placeholder="host:port:user:pass  (tự nhận http/socks5, trống = không proxy)"></div>
-    <button class="btn ghost-pink" onclick="chkCreateProxy()">${svg(I.play)}Kiểm tra proxy</button> <span id="cProxySt" class="dim" style="margin-left:8px">${CT.proxyChk}</span>`)
+    <button class="btn ghost-pink" onclick="chkCreateProxy()">${svg(I.play)}Kiểm tra proxy</button> <span id="cProxySt" class="dim" style="margin-left:8px">${CT.proxyChk}</span>
+    <div style="border-top:1px solid var(--line);margin:18px 0 14px"></div>
+    <div class="field"><label>Tags <span class="dim" style="font-weight:400">· cách nhau dấu phẩy</span></label><input id="cTags" placeholder="facebook, ads, us"></div>
+    <div class="inline" style="gap:14px">
+      <div style="flex:1"><label>Ghi chú</label><input id="cNote" placeholder="ghi chú ngắn"></div>
+      <div><label>Màu nhãn</label><input id="cColor" type="color" value="#EA1A87" style="height:42px;padding:4px;width:58px"></div>
+    </div>
+    <div class="checkline" style="margin-top:14px"><label class="toggle"><input id="cPin" type="checkbox"><span></span></label> Ghim lên đầu</div>`)
   + P("ketnoi",`
     <div class="field"><label>WebRTC</label><select><option>Base on IP (khuyến nghị)</option><option>Disable</option><option>Real</option></select></div>
     <div class="field"><label>Geolocation</label><select><option>Auto theo IP</option><option>Prompt</option><option>Block</option></select></div>
@@ -823,23 +1074,37 @@ function randPreview(){toast("Thông số sẽ random coherent khi tạo","");}
 function useLibPrx(){if(!STATE.proxies.length)return toast("Thư viện proxy trống","");const p=STATE.proxies[0];const e=document.getElementById("cProxy");if(e){e.value=p.raw_proxy;updateSum();}}
 async function chkCreateProxy(){const raw=val("cProxy");if(!raw)return toast("Nhập proxy","");document.getElementById("cProxySt").textContent="Đang kiểm tra...";try{const d=await j(`${API}/proxy/check`,body({raw_proxy:raw}));CT.proxyChk=d.alive?`● Sống ${d.exit_ip||''} ${d.country||''} ${d.latency_ms}ms`:`● Chết: ${d.error||''}`;document.getElementById("cProxySt").textContent=CT.proxyChk;}catch(e){document.getElementById("cProxySt").textContent=e.message;}}
 async function doCreate(){
-  const name=val("cName")||"Profile", os=val("cOs","Windows"), browser=val("cBrowser","Chrome"),
+  const name=(val("cName")||"").trim(), os=val("cOs","Windows"), browser=val("cBrowser","Chrome"),
     engine=val("cEngine"), proxy=val("cProxy"), tz=val("cTz"), group_id=val("cGroup"), cookies=val("cCookies");
+  const err=document.getElementById("cNameErr");
+  if(!name){if(err)err.classList.add("show");CT.tab="nhanh";switchTab&&document.querySelector('.tabs button[data-tt="nhanh"]')?.click();return toast("Nhập tên profile","err");}
+  if(err)err.classList.remove("show");
   const count=Math.max(1,Math.min(200,parseInt(val("cCount","1"))||1));
+  const start=Math.max(1,parseInt(val("cStart","1"))||1);
+  const base=(val("cNameRule")||"").trim()||name;                    // ưu tiên quy tắc đặt tên, không có thì dùng tên
+  const tmpl=(count>1&&!base.includes("{n}"))?base+" {n}":base;       // loạt mà thiếu {n} -> tự thêm để không trùng
+  const nameAt=i=>tmpl.replace(/\{n\}/g,String(start+i));
+  // meta chung (tags/note/màu/ghim) áp cho mọi profile tạo ra
+  const tags=val("cTags").split(",").map(t=>t.trim()).filter(Boolean);
+  const color=val("cColor"), note=val("cNote"), pinned=document.getElementById("cPin")?.checked;
+  const hasMeta=tags.length||note||pinned||(color&&color.toLowerCase()!=="#ea1a87");
+  const applyExtras=async pid=>{
+    if(proxy) await j(`${API}/profiles/${pid}/proxy`,body({raw_proxy:proxy})).catch(()=>{});
+    if(tz) await j(`${API}/profiles/${pid}/timezone`,body({timezone:tz})).catch(()=>{});
+    if(cookies.trim()) await j(`${API}/profiles/${pid}/cookies`,body({cookies})).catch(()=>{});
+    if(hasMeta) await j(`${API}/profiles/${pid}/meta`,body({tags,note,color,pinned})).catch(()=>{});
+  };
   try{
-    if(count>1){     // tạo hàng loạt — proxy/tz/cookies chung áp cho từng cái
-      const d=await j(`${API}/profiles/bulk-create`,body({count,name,os,browser,engine,group_id:group_id||null}));
-      for(const p of d.profiles){
-        if(proxy) await j(`${API}/profiles/${p.id}/proxy`,body({raw_proxy:proxy})).catch(()=>{});
-        if(tz) await j(`${API}/profiles/${p.id}/timezone`,body({timezone:tz})).catch(()=>{});
-        if(cookies.trim()) await j(`${API}/profiles/${p.id}/cookies`,body({cookies})).catch(()=>{});
-      }
+    if(count>1){
+      const d=await j(`${API}/profiles/bulk-create`,body({count,name:tmpl,os,browser,engine,group_id:group_id||null}));
+      await Promise.all(d.profiles.map(async(p,i)=>{
+        await j(`${API}/profiles/update/${p.id}`,body({name:nameAt(i)})).catch(()=>{});  // đổi tên theo quy tắc {n}
+        await applyExtras(p.id);
+      }));
       show(false);toast(`Đã tạo ${d.created} profile`,"ok");refresh();return;
     }
-    const r=await j(`${API}/profiles/create`,body({name,os,browser,engine,group_id:group_id||null}));
-    if(proxy) await j(`${API}/profiles/${r.id}/proxy`,body({raw_proxy:proxy})).catch(()=>{});
-    if(tz) await j(`${API}/profiles/${r.id}/timezone`,body({timezone:tz})).catch(()=>{});
-    if(cookies.trim()) await j(`${API}/profiles/${r.id}/cookies`,body({cookies})).catch(()=>{});
+    const r=await j(`${API}/profiles/create`,body({name:nameAt(0),os,browser,engine,group_id:group_id||null}));
+    await applyExtras(r.id);
     show(false);toast("Đã tạo profile: "+r.name,"ok");refresh();
   }catch(e){toast(e.message,"err");}
 }
@@ -863,42 +1128,41 @@ async function editP(id){
   const mode=(cur,ids)=>`<select id="${ids}">${["Noise","Real","Masked"].map(m=>`<option ${(''+(cur||'Noise')).toLowerCase()===m.toLowerCase()?'selected':''}>${m}</option>`).join("")}</select>`;
   const gi=GPUS.findIndex(g=>g.r===wm.renderer);
   const scrv=(scr.width>0)?`${scr.width}x${scr.height}`:"real";
-  document.getElementById("overlay").innerHTML=`<div class="modal">
+  const etabs=[["info","Thông tin"],["ketnoi","Kết nối"],["hardware","Hardware"],["software","Software"],["cookies","Cookies"]];
+  const EP_=(id,html)=>`<div class="tabpanel" data-tp="${id}" style="display:${id==='info'?'block':'none'}">${html}</div>`;
+  document.getElementById("overlay").innerHTML=`<div class="modal lg">
    <div class="mhead"><div class="ic">✎</div><h2>Sửa profile: ${esc(full.name)}</h2><button class="x" onclick="show(false)">✕</button></div>
    <div class="mbody">
-    <div class="tabs">
-      <button data-tt="info" class="on" onclick="switchTab('info')">Thông tin</button>
-      <button data-tt="hw" onclick="switchTab('hw')">Hardware / Fingerprint</button></div>
-    <div class="tabpanel" data-tp="info" style="display:block">
-      <div class="split" style="grid-template-columns:1fr 1fr">
+    <div class="tabs">${etabs.map(t=>`<button data-tt="${t[0]}" class="${t[0]==='info'?'on':''}" onclick="switchTab('${t[0]}')">${t[1]}</button>`).join("")}</div>
+    ${EP_("info",`<div class="split" style="grid-template-columns:1fr 1fr">
         <div><div class="field"><label>Tên</label><input id="eName" value="${esc(full.name)}"></div>
           <div class="field"><label>Nhóm</label><select id="eGroup"><option value="">Default group</option>${STATE.groups.map(g=>`<option value="${g.id}" ${full.group_id===g.id?'selected':''}>${esc(g.name)}</option>`).join("")}</select></div>
-          <div class="field"><label>Timezone (trống = auto)</label><input id="eTz" value="${esc(tz.auto_timezone?'':tz.timezone||'')}" placeholder="auto"></div></div>
+          <div class="field"><label>Tags (cách nhau bằng dấu phẩy)</label><input id="eTags" value="${esc((meta.tags||[]).join(', '))}" placeholder="vd: facebook, ads, us"></div></div>
         <div><div class="field"><label>Ghi chú</label><input id="eNote" value="${esc(meta.note||'')}"></div>
-          <div class="field"><label>Tags (cách nhau bằng dấu phẩy)</label><input id="eTags" value="${esc((meta.tags||[]).join(', '))}" placeholder="vd: facebook, ads, us"></div>
-          <div class="field"><label>Màu nhãn</label><input id="eColor" type="color" value="${esc(meta.color||'#EA1A87')}" style="height:42px;padding:4px"></div>
+          <div class="field"><label>Màu nhãn</label><input id="eColor" type="color" value="${esc(meta.color||'#EA1A87')}" style="height:42px;padding:4px;width:70px"></div>
           <div class="checkline"><label class="toggle"><input id="ePin" type="checkbox" ${meta.pinned?'checked':''}><span></span></label> Ghim lên đầu</div></div>
-      </div></div>
-    <div class="tabpanel" data-tp="hw" style="display:none">
-      <div class="split" style="grid-template-columns:1fr 1fr">
-       <div>
-        <div class="field"><label>Screen resolution</label><select id="eScreen"><option value="real" ${scrv==='real'?'selected':''}>Auto (màn thật)</option>${["1920x1080","2560x1440","1536x864","1366x768"].map(s=>`<option ${scrv===s?'selected':''}>${s}</option>`).join("")}</select></div>
-        <div class="field"><label>WebGL GPU</label><select id="eGpu"><option value="-1">Giữ nguyên hiện tại</option>${GPUS.map((g,i)=>`<option value="${i}" ${gi===i?'selected':''}>${g.n}</option>`).join("")}</select></div>
-        <div class="field"><label>Số nhân CPU</label><select id="eCores">${[2,4,6,8,12,16].map(n=>`<option ${nav.hardware_concurrency==n?'selected':''}>${n}</option>`).join("")}</select></div>
-        <div class="field"><label>Device memory (GB)</label><select id="eMem">${[4,8].map(n=>`<option ${nav.device_memory==n?'selected':''}>${n}</option>`).join("")}</select></div>
-       </div>
-       <div>
-        <div class="field"><label>Canvas</label>${mode(fp.canvas&&fp.canvas.mode,"eCanvas")}</div>
-        <div class="field"><label>Client Rects</label>${mode(fp.client_rect&&fp.client_rect.mode,"eRects")}</div>
-        <div class="field"><label>WebGL image</label>${mode(fp.webgl_image&&fp.webgl_image.mode,"eWebgl")}</div>
-        <div class="field"><label>Audio context</label>${mode(fp.audio_context&&fp.audio_context.mode,"eAudio")}</div>
-        <div class="checkline"><label class="toggle"><input id="eDnt" type="checkbox" ${nav.do_not_track?'checked':''}><span></span></label> Do Not Track</div>
-       </div>
+      </div>`)}
+    ${EP_("ketnoi",`<div class="field" style="max-width:420px"><label>Timezone (trống = auto theo IP proxy)</label><input id="eTz" value="${esc(tz.auto_timezone?'':tz.timezone||'')}" placeholder="auto — vd America/New_York"></div>
+      <p class="dim" style="font-size:13px">WebRTC/Geolocation mặc định an toàn (Base on IP). Timezone auto khớp IP exit của proxy; nhập tay để ép.</p>`)}
+    ${EP_("hardware",`<div class="split" style="grid-template-columns:1fr 1fr">
+       <div><div class="field"><label>Screen resolution</label><select id="eScreen"><option value="real" ${scrv==='real'?'selected':''}>Auto (màn thật)</option>${["1920x1080","2560x1440","1536x864","1366x768"].map(s=>`<option ${scrv===s?'selected':''}>${s}</option>`).join("")}</select></div>
+        <div class="field"><label>WebGL GPU</label><select id="eGpu"><option value="-1">Giữ nguyên hiện tại</option>${GPUS.map((g,i)=>`<option value="${i}" ${gi===i?'selected':''}>${g.n}</option>`).join("")}</select></div></div>
+       <div><div class="field"><label>Số nhân CPU</label><select id="eCores">${[2,4,6,8,12,16].map(n=>`<option ${nav.hardware_concurrency==n?'selected':''}>${n}</option>`).join("")}</select></div>
+        <div class="field"><label>Device memory (GB)</label><select id="eMem">${[4,8].map(n=>`<option ${nav.device_memory==n?'selected':''}>${n}</option>`).join("")}</select></div></div>
       </div>
-      <p class="dim" style="font-size:13px">Đổi GPU nên chọn coherent với cores (card rời = nhiều nhân). Noise = mỗi profile vân tay riêng.</p>
-    </div>
+      <p class="dim" style="font-size:13px">Đổi GPU nên chọn coherent với cores (card rời = nhiều nhân).</p>`)}
+    ${EP_("software",`<div class="split" style="grid-template-columns:1fr 1fr">
+       <div><div class="field"><label>Canvas</label>${mode(fp.canvas&&fp.canvas.mode,"eCanvas")}</div>
+        <div class="field"><label>Client Rects</label>${mode(fp.client_rect&&fp.client_rect.mode,"eRects")}</div></div>
+       <div><div class="field"><label>WebGL image</label>${mode(fp.webgl_image&&fp.webgl_image.mode,"eWebgl")}</div>
+        <div class="field"><label>Audio context</label>${mode(fp.audio_context&&fp.audio_context.mode,"eAudio")}</div></div>
+      </div>
+      <div class="checkline"><label class="toggle"><input id="eDnt" type="checkbox" ${nav.do_not_track?'checked':''}><span></span></label> Do Not Track</div>
+      <p class="dim" style="font-size:13px">Noise/Masked = mỗi profile vân tay riêng (chống link). Real = để lộ máy thật.</p>`)}
+    ${EP_("cookies",`<div class="field"><label>Nạp cookies (JSON hoặc Netscape)</label><textarea id="eCookies" rows="8" class="mono" style="resize:vertical" placeholder='[{"name":"...","value":"...","domain":".facebook.com"}]'></textarea></div>
+      <p class="dim" style="font-size:13px">Dán cookie rồi Lưu — sẽ nạp vào profile ở lần Mở tới. Để trống nếu không đổi.</p>`)}
    </div>
-   <div class="mfoot"><button class="btn" onclick="show(false)">Huỷ</button><button class="btn pri" onclick="saveEdit()">Lưu</button></div></div>`;
+   <div class="mfoot"><button class="btn" onclick="show(false)">Huỷ</button><button class="btn pri" onclick="saveEdit()">${svg(I.check)}Lưu thay đổi</button></div></div>`;
   show(true);}
 async function saveEdit(){const id=EP.id,fp=EP.fp;
   fp.navigator=fp.navigator||{};fp.screen=fp.screen||{};fp.webgl_meta_data=fp.webgl_meta_data||{};
@@ -912,6 +1176,7 @@ async function saveEdit(){const id=EP.id,fp=EP.fp;
     await j(`${API}/profiles/update/${id}`,body({name:val("eName"),group_id:val("eGroup")||null,fingerprint_data:fp}));
     await j(`${API}/profiles/${id}/meta`,body({note:val("eNote"),color:val("eColor"),pinned:document.getElementById("ePin").checked,tags:val("eTags").split(",").map(t=>t.trim()).filter(Boolean)}));
     await j(`${API}/profiles/${id}/timezone`,body({timezone:val("eTz")}));
+    const ck=val("eCookies").trim();if(ck) await j(`${API}/profiles/${id}/cookies`,body({cookies:ck})).catch(()=>{});
     show(false);toast("Đã lưu","ok");refresh();
   }catch(e){toast(e.message,"err");}}
 
@@ -935,8 +1200,10 @@ async function apSave(id){const prov=val("apProv");const payload=prov?{provider:
   if(STATE.view!=='home'&&STATE.view!=='profiles')return;
   if(document.getElementById('overlay').classList.contains('show'))return;
   const cm=document.getElementById('colMenu');if(cm&&cm.style.display==='block')return;  // đừng đóng menu cột đang mở
+  if(document.querySelector('.kmenu.show'))return;                                        // đừng đóng menu ⋯ đang mở
   const pq=document.getElementById('pq');if(pq&&(pq.value||pq===document.activeElement))return;  // đừng clobber khi đang tìm
-  load().then(render);
+  const sc=document.getElementById('content'),y=sc?sc.scrollTop:0;                        // giữ vị trí cuộn qua auto-refresh
+  load().then(()=>{render();const el=document.getElementById('content');if(el)el.scrollTop=y;});
 },6000);})();
 </script>
 </body>
