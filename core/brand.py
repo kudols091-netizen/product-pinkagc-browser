@@ -8,8 +8,9 @@ from __future__ import annotations
 APP_NAME = "PinkAgc Browser"
 APP_SHORT = "PinkAgc"
 VERSION = "0.1.0"                 # bản đóng gói hiện tại (tăng mỗi release)
-# JSON công bố bản mới: {"version":"x.y.z","url":"https://.../setup.exe","notes":"..."}; để trống = tắt check-update.
-UPDATE_URL = ""
+# Manifest công bố bản mới (bạn upload lên host của mình): JSON {"version","url","notes"}.
+# url = link tải .exe mới. App khách check cái này -> tự tải & thay exe. Để trống = tắt update.
+UPDATE_URL = "https://agency.pinkagc.com/browser/version.json"
 API_NS = "/api/v3"
 DEFAULT_PORT = 19996
 DEFAULT_DB = "asset/pinkagc.db"

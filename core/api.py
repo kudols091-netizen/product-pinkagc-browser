@@ -602,22 +602,26 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
 
     @app.get("/api/v3/check-update")
     def check_update():
-        """So phiên bản với brand.UPDATE_URL (JSON {version,url,notes}). Trống = tắt. Thuần stdlib."""
-        import re as _re
-        url = getattr(brand, "UPDATE_URL", "")
-        if not url:
-            return _ok({"current": brand.VERSION, "has_update": False, "reason": "chưa cấu hình UPDATE_URL"})
-        try:
-            import urllib.request
-            with urllib.request.urlopen(url, timeout=6) as r:
-                info = json.loads(r.read().decode("utf-8"))
-        except Exception as e:                       # noqa: BLE001
-            return _ok({"current": brand.VERSION, "has_update": False, "error": str(e)})
-        latest = str(info.get("version", ""))
-        tup = lambda v: tuple(int(x) for x in _re.findall(r"\d+", v)[:3])
-        has = bool(latest) and tup(latest) > tup(brand.VERSION)
-        return _ok({"current": brand.VERSION, "latest": latest, "has_update": has,
-                    "url": info.get("url", ""), "notes": info.get("notes", "")})
+        """So phiên bản với manifest brand.UPDATE_URL (JSON {version,url,notes})."""
+        from . import updater
+        d = updater.check()
+        d["frozen"] = updater.is_frozen()           # bản .exe mới self-update được
+        return _ok(d)
+
+    @app.post("/api/v3/update/apply")
+    def update_apply():
+        """Tải & cài bản mới (bản .exe). Nếu ok -> hẹn thoát app 1.5s để .bat thay exe rồi mở lại."""
+        from . import updater
+        info = updater.check()
+        if not info.get("has_update"):
+            return _err("Không có bản mới (hoặc chưa cấu hình UPDATE_URL).")
+        ok, msg = updater.apply_update(info.get("url", ""))
+        if ok:
+            import os as _os
+            import threading
+            threading.Timer(1.5, lambda: _os._exit(0)).start()   # thoát để _update.bat thay exe
+            return _ok({"ok": True, "message": msg, "latest": info.get("latest")})
+        return _err(msg)
 
     return app
 

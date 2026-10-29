@@ -711,8 +711,13 @@ function viewAbout(){return `<div class="phead"><h1>Giới <em>thiệu</em></h1>
   <div id="updLine" class="dim" style="margin-top:8px;font-size:12.5px"></div>
   <div id="healthLine" class="dim" style="margin-top:14px;font-size:13px">Đang kiểm tra engine...</div></div>`;}
 async function checkUpdate(btn){const u=document.getElementById("updLine");u.textContent="Đang kiểm tra...";try{const d=await j(`${API}/check-update`);
-  if(d.has_update)u.innerHTML=`<span style="color:var(--primary);font-weight:700">● Có bản mới ${esc(d.latest)}</span>${d.url?` — <a href="${esc(d.url)}" target="_blank">Tải</a>`:''}${d.notes?`<br><span class="dim">${esc(d.notes)}</span>`:''}`;
-  else u.innerHTML=`<span style="color:var(--ok)">● Đang dùng bản mới nhất</span>${d.reason?` <span class="dim">(${esc(d.reason)})</span>`:''}`;}catch(e){u.textContent=e.message;}}
+  if(d.has_update){u.innerHTML=`<span style="color:var(--primary);font-weight:700">● Có bản mới ${esc(d.latest)}</span>`
+    +(d.frozen?` <button class="btn sm pri" style="margin-left:6px" onclick="applyUpdate()">${svg(I.up)}Cài bản mới</button>`
+             :(d.url?` — <a href="${esc(d.url)}" target="_blank">Tải thủ công</a> <span class="dim">(bản dev: git pull)</span>`:""))
+    +(d.notes?`<br><span class="dim">${esc(d.notes)}</span>`:"");}
+  else u.innerHTML=`<span style="color:var(--ok)">● Đang dùng bản mới nhất</span>${d.reason?` <span class="dim">(${esc(d.reason)})</span>`:""}${d.error?` <span class="dim">(không kết nối máy chủ cập nhật)</span>`:""}`;}catch(e){u.textContent=e.message;}}
+async function applyUpdate(){const u=document.getElementById("updLine");if(!confirm("Tải và cài bản mới? App sẽ tự đóng, cài rồi mở lại (vài giây)."))return;
+  u.innerHTML="⏳ Đang tải & cài bản mới...";try{const d=await j(`${API}/update/apply`);u.innerHTML=`<span style="color:var(--ok)">● ${esc(d.message)}</span>`;}catch(e){u.innerHTML=`<span style="color:var(--err)">${esc(e.message)}</span>`;}}
 async function loadHealth(){try{const d=await j(`${API}/health`);document.getElementById("healthLine")&&(document.getElementById("healthLine").innerHTML=`<span class="dot ok"></span> ${esc(d.app)} · engine: ${d.engines.join(", ")} · đang chạy: ${d.running.length}`);}catch(e){}}
 async function loadAbout(){try{const v=await j(`${API}/version`);const e=document.getElementById("appVer");if(e)e.textContent="v"+v.version;}catch(e){}loadHealth();}
 
