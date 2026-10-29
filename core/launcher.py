@@ -15,8 +15,6 @@ import sys
 from pathlib import Path
 from typing import Any, Iterator
 
-from camoufox.sync_api import Camoufox
-
 from .db import Database, Profile
 from .fingerprint import to_camoufox, parse_gpm
 
@@ -43,6 +41,10 @@ def open_profile(db: Database, profile: Profile, profiles_root: str | Path, *,
     for w in warnings:
         print(f"[warn] {w}", file=sys.stderr)
     db.mark_run(profile.id)
+    try:
+        from camoufox.sync_api import Camoufox   # lười: chỉ cần khi mở engine camoufox (exe không bundle playwright)
+    except ImportError:
+        raise RuntimeError("Engine camoufox cần 'camoufox'+'playwright' (bản .exe không kèm) — dùng ovobrowser/fpchromium.")
     try:
         cam = Camoufox(**kwargs)
     except ValueError as e:

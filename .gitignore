@@ -14,3 +14,7 @@ asset/*.db-shm
 _screenshots/
 # config tool design cục bộ
 .impeccable/
+# output đóng gói PyInstaller (exe + work dir + spec sinh ra)
+dist/
+build/_pyi/
+build/*.spec
