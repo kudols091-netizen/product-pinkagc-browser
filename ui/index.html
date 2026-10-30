@@ -1416,10 +1416,11 @@ async function doCreate(){
   const advOn=document.getElementById("cMaster")?.checked;   // Master Power: tắt -> bỏ qua toàn bộ spoof nâng cao
   const bandwidth=advOn&&document.getElementById("cBandwidth")?.checked, engineVer=advOn?val("cEngineVer"):"", fakeCam=advOn?val("cFakeCam"):"", fakeMic=advOn?val("cFakeMic"):"";
   const hasMeta=tags.length||note||pinned||(color&&color.toLowerCase()!=="#ea1a87");
+  let ckZero=false;
   const applyExtras=async pid=>{
     if(proxy) await j(`${API}/profiles/${pid}/proxy`,body({raw_proxy:proxy})).catch(()=>{});
     if(tz) await j(`${API}/profiles/${pid}/timezone`,body({timezone:tz})).catch(()=>{});
-    if(cookies.trim()) await j(`${API}/profiles/${pid}/cookies`,body({cookies})).catch(()=>{});
+    if(cookies.trim()){const cr=await j(`${API}/profiles/${pid}/cookies`,body({cookies})).catch(()=>null);if(cr&&cr.count===0)ckZero=true;}
     if(hasMeta) await j(`${API}/profiles/${pid}/meta`,body({tags,note,color,pinned})).catch(()=>{});
     if(bandwidth||engineVer||fakeCam||fakeMic) await j(`${API}/profiles/${pid}/options`,body({save_bandwidth:!!bandwidth,engine_version:engineVer||"",fake_camera:fakeCam||"",fake_mic:fakeMic||""})).catch(()=>{});
   };
@@ -1430,11 +1431,11 @@ async function doCreate(){
         await j(`${API}/profiles/update/${p.id}`,body({name:nameAt(i)})).catch(()=>{});  // đổi tên theo quy tắc {n}
         await applyExtras(p.id);
       }));
-      show(false);toast(`Đã tạo ${d.created} profile`,"ok");refresh();return;
+      show(false);toast(`Đã tạo ${d.created} profile`+(ckZero?" · cookies không parse được (sai định dạng)":""),ckZero?"err":"ok");refresh();return;
     }
     const r=await j(`${API}/profiles/create`,body({name:nameAt(0),os,browser,engine,group_id:group_id||null}));
     await applyExtras(r.id);
-    show(false);toast("Đã tạo profile: "+r.name,"ok");refresh();
+    show(false);toast("Đã tạo profile: "+r.name+(ckZero?" · cookies không parse được (sai định dạng)":""),ckZero?"err":"ok");refresh();
   }catch(e){toast(e.message,"err");}
 }
 
@@ -1522,8 +1523,9 @@ async function saveEdit(){const id=EP.id,fp=EP.fp;
     await j(`${API}/profiles/${id}/timezone`,body({timezone:val("eTz")}));
     const em=document.getElementById("eMaster")?.checked;   // Master tắt -> lưu sạch, xoá spoof cũ
     await j(`${API}/profiles/${id}/options`,body({save_bandwidth:!!(em&&document.getElementById("eBandwidth")?.checked),engine_version:em?(val("eEngineVer")||""):"",fake_camera:em?(val("eFakeCam")||""):"",fake_mic:em?(val("eFakeMic")||""):""})).catch(()=>{});
-    const ck=val("eCookies").trim();if(ck) await j(`${API}/profiles/${id}/cookies`,body({cookies:ck})).catch(()=>{});
-    show(false);toast("Đã lưu","ok");refresh();
+    let ckWarn="";
+    const ck=val("eCookies").trim();if(ck){const cr=await j(`${API}/profiles/${id}/cookies`,body({cookies:ck})).catch(()=>null);if(cr&&cr.count===0)ckWarn=" · cookies không parse được (sai định dạng JSON/Netscape)";}
+    show(false);toast("Đã lưu"+ckWarn, ckWarn?"err":"ok");refresh();
   }catch(e){toast(e.message,"err");}}
 
 /* ----- assign proxy to profile ----- */
