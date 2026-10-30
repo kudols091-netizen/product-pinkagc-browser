@@ -694,6 +694,7 @@ function viewAutomation(){const opts=STATE.profiles.map(p=>`<option value="${p.i
     <div class="toolbar" style="margin-top:16px"><button class="btn" onclick="auValidate()">${svg(I.check)}Kiểm tra</button>
       <button class="btn pri" id="auRunBtn" onclick="auRun()">${svg(I.play)}Chạy (1 profile)</button>
       <button class="btn" onclick="auRunAll()" title="Đồng bộ: chạy kịch bản này trên MỌI profile đang chạy cùng lúc">${svg(I.copy)}Chạy đồng bộ (${STATE.profiles.filter(p=>p.status==='running').length} đang mở)</button>
+      <button class="btn" id="auRecBtn" onclick="auRecordToggle()" title="Ghi thao tác trực tiếp trên trình duyệt của profile đang mở → tự sinh bước">⏺ Ghi thao tác</button>
       <button class="btn ghost-pink" id="auStopBtn" onclick="auStop()" style="display:none">${svg(I.stop)}Dừng</button></div>
    </div>
    <div><div class="summary"><b>${Object.keys(AU_ACTIONS).length}+ action hỗ trợ</b>
@@ -707,6 +708,23 @@ function viewAutomation(){const opts=STATE.profiles.map(p=>`<option value="${p.i
 async function auValidate(){let steps;try{steps=auGetSteps();}catch(e){return document.getElementById("auOut").textContent="JSON lỗi: "+e.message;}
   try{const d=await j(`${API}/automation/validate`,body({steps}));document.getElementById("auOut").textContent=d.valid?"✓ Cú pháp hợp lệ ("+steps.length+" bước)":"✗ Lỗi:\n"+d.errors.join("\n");document.getElementById("auStatus").textContent=d.valid?"Hợp lệ":"Cú pháp lỗi";}catch(e){document.getElementById("auOut").textContent=e.message;}}
 let AUABORT=null;
+/* Recorder: ghi thao tác người dùng trên trình duyệt profile -> sinh bước tự động */
+let AUREC=null;
+async function auRecordToggle(){
+  if(AUREC){clearInterval(AUREC.timer);const pid=AUREC.pid;AUREC=null;auSetRec(false);
+    try{const d=await j(`${API}/profiles/${pid}/record/fetch`,body({}));auAppendRec(d.steps);}catch(e){}
+    toast("Đã dừng ghi","ok");return;}
+  const pid=val("auProf");if(!pid)return toast("Chọn 1 profile ở ô Profile","err");
+  const p=(STATE.profiles||[]).find(x=>x.id===pid);
+  if(!p||p.status!=="running")return toast("Profile chưa mở — bấm Mở ở màn Profiles trước khi ghi","err");
+  try{await j(`${API}/profiles/${pid}/record/start`,body({}));}catch(e){return toast(e.message,"err");}
+  auInitSteps();AUREC={pid,timer:setInterval(()=>auRecPoll(pid),2000)};auSetRec(true);
+  toast("Đang ghi — cứ thao tác trên cửa sổ trình duyệt của profile","ok");
+}
+async function auRecPoll(pid){try{const d=await j(`${API}/profiles/${pid}/record/fetch`,body({}));auAppendRec(d.steps);}catch(e){}}
+function auAppendRec(steps){if(!steps||!steps.length)return;STATE.autoSteps=(STATE.autoSteps||[]).concat(steps);
+  if((STATE.autoMode||"build")==="build")auRerender();else{const t=document.getElementById("auJson");if(t)t.value=JSON.stringify(auStepsClean(),null,2);}}
+function auSetRec(on){const b=document.getElementById("auRecBtn");if(b){b.innerHTML=on?'⏹ Dừng ghi':'⏺ Ghi thao tác';b.classList.toggle('pri',on);}}
 function auSetRunning(on){const r=document.getElementById("auRunBtn"),s=document.getElementById("auStopBtn");if(r)r.style.display=on?'none':'';if(s)s.style.display=on?'':'none';}
 function auStop(){if(AUABORT)AUABORT.abort();}
 /* Đồng bộ thao tác: chạy cùng 1 kịch bản trên MỌI profile đang chạy, song song */

@@ -497,6 +497,79 @@ def _solve_captcha_2captcha(apikey: str, ctype: str, sitekey: str, pageurl: str,
     raise RuntimeError("captcha quá thời gian chờ")
 
 
+# ---------------------------------------------------------------- Recorder (ghi thao tác -> step)
+
+# Inject vào trang live: bắt click/change + ghi URL, sinh selector ổn định (id > attr > path nth-of-type).
+# Đẩy vào window.__pinkrec; UI poll fetch_recording để rút ra trước khi điều hướng xoá biến window.
+_RECORDER_JS = r"""(function(){
+  window.__pinkrec = window.__pinkrec || [];
+  if(!window.__pinkRecNav){ window.__pinkRecNav = 1;
+    try{ window.__pinkrec.push({action:'goto', url: location.href}); }catch(e){} }
+  if(window.__pinkRecOn) return; window.__pinkRecOn = true;
+  function uniq(s){ try{ return document.querySelectorAll(s).length === 1; }catch(e){ return false; } }
+  function sel(el){
+    if(!el || el.nodeType !== 1 || el === document.body) return 'body';
+    if(el.id && uniq('#'+CSS.escape(el.id))) return '#'+CSS.escape(el.id);
+    for(var i=0;i<4;i++){ var a=['data-testid','name','aria-label','placeholder'][i];
+      var v = el.getAttribute && el.getAttribute(a);
+      if(v){ var s = el.tagName.toLowerCase()+'['+a+'="'+String(v).replace(/"/g,'\\"')+'"]'; if(uniq(s)) return s; } }
+    var path=[], node=el;
+    while(node && node.nodeType===1 && node!==document.body){
+      var part=node.tagName.toLowerCase();
+      var sib=[].slice.call(node.parentNode?node.parentNode.children:[]).filter(function(c){return c.tagName===node.tagName;});
+      if(sib.length>1) part += ':nth-of-type('+(sib.indexOf(node)+1)+')';
+      path.unshift(part);
+      if(uniq(path.join('>'))) break;
+      node=node.parentNode;
+    }
+    return path.join('>') || el.tagName.toLowerCase();
+  }
+  document.addEventListener('click', function(e){
+    var t=e.target; if(!t) return;
+    window.__pinkrec.push({action:'click', selector: sel(t)});
+  }, true);
+  document.addEventListener('change', function(e){
+    var t=e.target; if(!t||t.nodeType!==1) return; var tag=t.tagName;
+    if(tag==='SELECT') window.__pinkrec.push({action:'select', selector: sel(t), value: t.value});
+    else if(tag==='INPUT'||tag==='TEXTAREA') window.__pinkrec.push({action:'fill', selector: sel(t), text: t.value});
+  }, true);
+})();"""
+
+_DRAIN_JS = "(()=>{const r=window.__pinkrec||[];window.__pinkrec=[];return r;})()"
+
+
+def start_recording(ws_endpoint: str, *, engine: str = "chromium") -> bool:
+    """Bật ghi thao tác: inject recorder vào trang hiện tại + mọi trang mở sau (add_init_script)."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        browser = _connect(pw, engine, ws_endpoint)
+        ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+        ctx.add_init_script(_RECORDER_JS)                    # trang mở sau khi bật
+        for p in ctx.pages:
+            try:
+                p.evaluate(_RECORDER_JS)                      # trang đang mở
+            except Exception:  # noqa: BLE001
+                pass
+        browser.close()
+    return True
+
+
+def fetch_recording(ws_endpoint: str, *, engine: str = "chromium") -> list[dict]:
+    """Rút các thao tác đã ghi từ mọi trang (xoá khỏi trang). Gọi lặp lại để gom trước khi điều hướng."""
+    from playwright.sync_api import sync_playwright
+    steps: list[dict] = []
+    with sync_playwright() as pw:
+        browser = _connect(pw, engine, ws_endpoint)
+        ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+        for p in ctx.pages:
+            try:
+                steps += p.evaluate(_DRAIN_JS) or []
+            except Exception:  # noqa: BLE001
+                pass
+        browser.close()
+    return steps
+
+
 def run_script(ws_endpoint: str, steps: list[dict], *, engine: str = "chromium",
                workdir: str | Path = ".", default_timeout: int = 20000) -> dict:
     """Nối browser (camoufox=Playwright Firefox, còn lại=CDP Chromium), chạy step. Trả {ok, log[], data{}}."""

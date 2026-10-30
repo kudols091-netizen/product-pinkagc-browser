@@ -489,6 +489,30 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             return _err(msg, code)
         return _ok(res)
 
+    @app.post("/api/v3/profiles/<pid>/record/start")
+    def record_start(pid: str):
+        if pid not in running:
+            return _err("profile chưa mở — mở profile trước khi ghi thao tác", 400)
+        from . import automation
+        ws, eng = running[pid][1], running[pid][2]
+        try:
+            automation.start_recording(ws, engine=eng)
+        except Exception as e:  # noqa: BLE001
+            return _err(f"không bật được ghi: {e}", 500)
+        return _ok({"recording": True})
+
+    @app.post("/api/v3/profiles/<pid>/record/fetch")
+    def record_fetch(pid: str):
+        if pid not in running:
+            return _err("profile chưa mở", 400)
+        from . import automation
+        ws, eng = running[pid][1], running[pid][2]
+        try:
+            steps = automation.fetch_recording(ws, engine=eng)
+        except Exception as e:  # noqa: BLE001
+            return _err(str(e), 500)
+        return _ok({"steps": steps})
+
     @app.post("/api/v3/profiles/<pid>/options")
     def profile_options(pid: str):
         """Merge cờ hành vi vào dynamic_data (vd save_bandwidth = chặn ảnh tiết kiệm băng thông)."""
