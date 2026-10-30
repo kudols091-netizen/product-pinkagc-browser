@@ -528,13 +528,30 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         for k in ("save_bandwidth",):                 # whitelist cờ bool
             if k in b:
                 dyn[k] = bool(b[k])
-        for k in ("engine_version", "fake_camera"):    # cờ chuỗi (version engine / video camera giả .y4m)
+        for k in ("engine_version", "fake_camera", "fake_mic"):   # cờ chuỗi (version / camera .y4m / mic .wav)
             if k in b:
                 dyn[k] = str(b[k] or "")
         db.set_dynamic_data(pid, dyn)
         return _ok({"id": pid, "save_bandwidth": dyn.get("save_bandwidth", False),
                     "engine_version": dyn.get("engine_version", ""),
-                    "fake_camera": dyn.get("fake_camera", "")})
+                    "fake_camera": dyn.get("fake_camera", ""), "fake_mic": dyn.get("fake_mic", "")})
+
+    @app.post("/api/v3/pick-file")
+    def pick_file():
+        """Mở hộp chọn file native (Windows) → trả đường dẫn tuyệt đối. Cho nút Browse (web UI giấu path)."""
+        import subprocess
+        flt = str((request.get_json(silent=True) or {}).get("filter", "All files|*.*"))
+        flt = flt.replace("'", "")                     # chặn phá chuỗi PS
+        ps = ("Add-Type -AssemblyName System.Windows.Forms;"
+              "$f=New-Object System.Windows.Forms.OpenFileDialog;"
+              f"$f.Filter='{flt}';$f.Title='Chon file';"
+              "if($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){Write-Output $f.FileName}")
+        try:
+            out = subprocess.run(["powershell", "-NoProfile", "-STA", "-Command", ps],
+                                 capture_output=True, text=True, timeout=180)
+            return _ok({"path": out.stdout.strip()})
+        except Exception as e:  # noqa: BLE001
+            return _err(f"không mở được hộp chọn file: {e}", 500)
 
     @app.post("/api/v3/ai/workflow")
     def ai_workflow():

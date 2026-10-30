@@ -1326,7 +1326,10 @@ function createTab(bro){
     </div>
     <div class="checkline" style="margin-top:14px"><label class="toggle"><input id="cPin" type="checkbox"><span></span></label> Ghim lên đầu</div>
     <div class="checkline"><label class="toggle"><input id="cBandwidth" type="checkbox"><span></span></label> Tiết kiệm băng thông <span class="dim" style="font-size:12px">(chặn tải ảnh — farm nhiều nick, đỡ tốn proxy)</span></div>
-    <div class="field" style="margin-top:12px"><label>Camera giả <span class="dim" style="font-weight:400">· đường dẫn video <code>.y4m</code> feed vào webcam (KYC/liveness; trống = tắt)</span></label><input id="cFakeCam" placeholder="C:\\video\\face.y4m"></div>`)
+    <div class="field" style="margin-top:12px"><label>Camera giả <span class="dim" style="font-weight:400">· video <code>.y4m</code> feed vào webcam (KYC/liveness; trống = tắt)</span></label>
+      <div class="inline" style="gap:8px"><input id="cFakeCam" placeholder="C:\\video\\face.y4m" style="flex:1"><button type="button" class="btn" onclick="pickFile('cFakeCam','Video Y4M|*.y4m')">Browse</button></div></div>
+    <div class="field"><label>Micro giả <span class="dim" style="font-weight:400">· audio <code>.wav</code> feed vào mic (trống = tắt)</span></label>
+      <div class="inline" style="gap:8px"><input id="cFakeMic" placeholder="C:\\audio\\voice.wav" style="flex:1"><button type="button" class="btn" onclick="pickFile('cFakeMic','Audio WAV|*.wav')">Browse</button></div></div>`)
   + P("ketnoi",`
     <div class="field"><label>WebRTC</label><select><option>Base on IP (khuyến nghị)</option><option>Disable</option><option>Real</option></select></div>
     <div class="field"><label>Geolocation</label><select><option>Auto theo IP</option><option>Prompt</option><option>Block</option></select></div>
@@ -1349,6 +1352,7 @@ function createTab(bro){
     <p class="dim" style="font-size:13px">Dán cookie — sẽ tự <b>nạp vào trình duyệt ở lần Mở tới</b> (Chromium lưu lại vào profile).</p>`);
 }
 function val(id,d=""){const e=document.getElementById(id);return e?e.value:d;}
+async function pickFile(inputId,filter){try{const d=await j(`${API}/pick-file`,body({filter:filter||"All files|*.*"}));if(d.path){const e=document.getElementById(inputId);if(e)e.value=d.path;toast("Đã chọn file","ok");}}catch(e){toast(e.message,"err");}}
 function updateSum(){const s=document.getElementById("cSum");if(!s)return;
   const b=val("cBrowser","Chrome"),os=val("cOs","Windows"),pr=val("cProxy")?'Có':'None',tz=val("cTz")||'Auto';
   s.innerHTML=[["Browser",b],["OS",os],["User agent","Auto"],["Proxy",pr],["Language","Auto"],["Timezone",tz],["WebRTC","Base on IP"],["GPU","Pool thật (coherent)"],["Screen","Auto"]].map(r=>`<div class="row"><span>${r[0]}</span><span>${esc(r[1])}</span></div>`).join("");}
@@ -1369,14 +1373,14 @@ async function doCreate(){
   // meta chung (tags/note/màu/ghim) áp cho mọi profile tạo ra
   const tags=val("cTags").split(",").map(t=>t.trim()).filter(Boolean);
   const color=val("cColor"), note=val("cNote"), pinned=document.getElementById("cPin")?.checked;
-  const bandwidth=document.getElementById("cBandwidth")?.checked, engineVer=val("cEngineVer"), fakeCam=val("cFakeCam");
+  const bandwidth=document.getElementById("cBandwidth")?.checked, engineVer=val("cEngineVer"), fakeCam=val("cFakeCam"), fakeMic=val("cFakeMic");
   const hasMeta=tags.length||note||pinned||(color&&color.toLowerCase()!=="#ea1a87");
   const applyExtras=async pid=>{
     if(proxy) await j(`${API}/profiles/${pid}/proxy`,body({raw_proxy:proxy})).catch(()=>{});
     if(tz) await j(`${API}/profiles/${pid}/timezone`,body({timezone:tz})).catch(()=>{});
     if(cookies.trim()) await j(`${API}/profiles/${pid}/cookies`,body({cookies})).catch(()=>{});
     if(hasMeta) await j(`${API}/profiles/${pid}/meta`,body({tags,note,color,pinned})).catch(()=>{});
-    if(bandwidth||engineVer||fakeCam) await j(`${API}/profiles/${pid}/options`,body({save_bandwidth:!!bandwidth,engine_version:engineVer||"",fake_camera:fakeCam||""})).catch(()=>{});
+    if(bandwidth||engineVer||fakeCam||fakeMic) await j(`${API}/profiles/${pid}/options`,body({save_bandwidth:!!bandwidth,engine_version:engineVer||"",fake_camera:fakeCam||"",fake_mic:fakeMic||""})).catch(()=>{});
   };
   try{
     if(count>1){
@@ -1406,8 +1410,11 @@ const GPUS=[
 let EP=null;
 async function editP(id){
   let full; try{full=await j(`${API}/profiles/${id}`);}catch(e){return toast(e.message,"err");}
+  if(!STATE.engines){try{STATE.engines=await j(`${API}/engines`);}catch(e){}}
   EP={id,fp:full.fingerprint_data||{}};const fp=EP.fp;
-  const nav=fp.navigator||{},scr=fp.screen||{},wm=fp.webgl_meta_data||{},tz=fp.timezone||{},meta=(full.dynamic_data||{}).meta||{};
+  const dyn=full.dynamic_data||{};
+  const nav=fp.navigator||{},scr=fp.screen||{},wm=fp.webgl_meta_data||{},tz=fp.timezone||{},meta=dyn.meta||{};
+  const engOpts=`<option value="">Mặc định (gói sẵn)</option>`+((STATE.engines&&STATE.engines.installed||[]).filter(e=>!e.builtin).map(e=>`<option value="${esc(e.version)}" ${dyn.engine_version===e.version?'selected':''}>Chrome ${esc(e.version)}</option>`).join(""));
   CT.tab="info";
   const mode=(cur,ids)=>`<select id="${ids}">${["Noise","Real","Masked"].map(m=>`<option ${(''+(cur||'Noise')).toLowerCase()===m.toLowerCase()?'selected':''}>${m}</option>`).join("")}</select>`;
   const gi=GPUS.findIndex(g=>g.r===wm.renderer);
@@ -1442,7 +1449,14 @@ async function editP(id){
         <div class="field"><label>Audio context</label>${mode(fp.audio_context&&fp.audio_context.mode,"eAudio")}</div></div>
       </div>
       <div class="checkline"><label class="toggle"><input id="eDnt" type="checkbox" ${nav.do_not_track?'checked':''}><span></span></label> Do Not Track</div>
-      <p class="dim" style="font-size:13px">Noise/Masked = mỗi profile vân tay riêng (chống link). Real = để lộ máy thật.</p>`)}
+      <p class="dim" style="font-size:13px">Noise/Masked = mỗi profile vân tay riêng (chống link). Real = để lộ máy thật.</p>
+      <div style="border-top:1px solid var(--line);margin:16px 0 12px"></div><b style="font-size:13px">Nâng cao</b>
+      <div class="checkline" style="margin-top:8px"><label class="toggle"><input id="eBandwidth" type="checkbox" ${dyn.save_bandwidth?'checked':''}><span></span></label> Tiết kiệm băng thông (chặn tải ảnh)</div>
+      <div class="field" style="margin-top:10px"><label>Phiên bản Chrome <span class="dim" style="font-weight:400">· khoá version cho nick</span></label><select id="eEngineVer">${engOpts}</select></div>
+      <div class="split" style="grid-template-columns:1fr 1fr">
+        <div class="field"><label>Camera giả (.y4m)</label><div class="inline" style="gap:6px"><input id="eFakeCam" value="${esc(dyn.fake_camera||'')}" placeholder="C:\\video\\face.y4m" style="flex:1"><button type="button" class="btn sm" onclick="pickFile('eFakeCam','Video Y4M|*.y4m')">Browse</button></div></div>
+        <div class="field"><label>Micro giả (.wav)</label><div class="inline" style="gap:6px"><input id="eFakeMic" value="${esc(dyn.fake_mic||'')}" placeholder="C:\\audio\\voice.wav" style="flex:1"><button type="button" class="btn sm" onclick="pickFile('eFakeMic','Audio WAV|*.wav')">Browse</button></div></div>
+      </div>`)}
     ${EP_("cookies",`<div class="field"><label>Nạp cookies (JSON hoặc Netscape)</label><textarea id="eCookies" rows="8" class="mono" style="resize:vertical" placeholder='[{"name":"...","value":"...","domain":".facebook.com"}]'></textarea></div>
       <p class="dim" style="font-size:13px">Dán cookie rồi Lưu — sẽ nạp vào profile ở lần Mở tới. Để trống nếu không đổi.</p>`)}
    </div>
@@ -1460,6 +1474,7 @@ async function saveEdit(){const id=EP.id,fp=EP.fp;
     await j(`${API}/profiles/update/${id}`,body({name:val("eName"),group_id:val("eGroup")||null,fingerprint_data:fp}));
     await j(`${API}/profiles/${id}/meta`,body({note:val("eNote"),color:val("eColor"),pinned:document.getElementById("ePin").checked,tags:val("eTags").split(",").map(t=>t.trim()).filter(Boolean)}));
     await j(`${API}/profiles/${id}/timezone`,body({timezone:val("eTz")}));
+    await j(`${API}/profiles/${id}/options`,body({save_bandwidth:!!document.getElementById("eBandwidth")?.checked,engine_version:val("eEngineVer")||"",fake_camera:val("eFakeCam")||"",fake_mic:val("eFakeMic")||""})).catch(()=>{});
     const ck=val("eCookies").trim();if(ck) await j(`${API}/profiles/${id}/cookies`,body({cookies:ck})).catch(()=>{});
     show(false);toast("Đã lưu","ok");refresh();
   }catch(e){toast(e.message,"err");}}
