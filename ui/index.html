@@ -1293,7 +1293,12 @@ async function checkPrx(id){const x=STATE.proxies.find(p=>p.id===id);if(!x)retur
 /* ================= CREATE / EDIT MODAL ================= */
 let CT={tab:"nhanh",proxyChk:""};
 function openCreate(){CT={tab:"nhanh",proxyChk:""};renderCreate();show(true);
-  j(`${API}/engines`).then(d=>{STATE.engines=d;if(document.getElementById("cEngineVer"))renderCreate();}).catch(()=>{});}
+  // engines tải xong: CHỈ cập nhật dropdown phiên bản tại chỗ (không dựng lại cả form -> khỏi wipe tên/Master đang nhập)
+  j(`${API}/engines`).then(d=>{STATE.engines=d;const sel=document.getElementById("cEngineVer");if(!sel)return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">Mặc định (gói sẵn)</option>'+((d&&d.installed)||[]).filter(e=>!e.builtin).map(e=>`<option value="${esc(e.version)}">Chrome ${esc(e.version)}</option>`).join("");
+    sel.value=cur;toggleAdv('c');
+  }).catch(()=>{});}
 function show(on){document.getElementById("overlay").classList.toggle("show",on);if(!on)document.getElementById("overlay").innerHTML="";}
 function renderCreate(){
   const bro=STATE.browsers.length?STATE.browsers.map(b=>`<option value="${b.value}">${esc(b.label)} (${b.engine})</option>`).join(""):'<option value="Chrome">Chrome</option>';
