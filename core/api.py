@@ -92,6 +92,8 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         "canvas": "Noise", "client_rect": "Noise", "webgl": "Noise", "webgl_meta": "Masked",
         "audio": "Noise", "font": "Masked", "screen": "Real", "language": "Base on IP",
         "start_url": "", "chrome_params": "", "clear_cache": True, "limit_window": True,
+        # AI dựng kịch bản (gap #3b) — provider openai-compatible hoặc gemini
+        "ai_provider": "openai", "ai_base_url": "", "ai_key": "", "ai_model": "",
     }
 
     def _load_settings() -> dict:
@@ -526,6 +528,19 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
                 dyn[k] = bool(b[k])
         db.set_dynamic_data(pid, dyn)
         return _ok({"id": pid, "save_bandwidth": dyn.get("save_bandwidth", False)})
+
+    @app.post("/api/v3/ai/workflow")
+    def ai_workflow():
+        """Sinh kịch bản automation từ lời. Đọc provider/key ở settings."""
+        from . import ai
+        task = (request.get_json(silent=True) or {}).get("task", "")
+        s = _load_settings()
+        if not s.get("ai_key"):
+            return _err("Chưa cấu hình AI — vào Cài đặt → AI nhập API key", 400)
+        res = ai.generate_workflow(task, lambda msgs: ai.call_llm_http(s, msgs))
+        if res.get("error") and not res.get("steps"):
+            return _err(res["error"])
+        return _ok(res)
 
     # ---- Scripts (kịch bản lưu sẵn) ----
     @app.get("/api/v3/scripts")

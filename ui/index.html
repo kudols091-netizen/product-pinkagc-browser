@@ -681,6 +681,10 @@ function viewAutomation(){const opts=STATE.profiles.map(p=>`<option value="${p.i
       <div class="seg" style="align-self:flex-end"><button class="${mode==='build'?'on':''}" onclick="auMode('build')">Trình dựng</button><button class="${mode==='json'?'on':''}" onclick="auMode('json')">JSON</button></div>
     </div>
     <div class="inline" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <input id="auAiTask" placeholder="✨ Mô tả việc cần làm bằng lời — AI tự dựng kịch bản (vd: mở facebook, đăng nhập {{user}}/{{pass}}, chờ 3 giây, chụp màn)" style="flex:1;min-width:280px" onkeydown="if(event.key==='Enter')auAiGen()">
+      <button class="btn pri" id="auAiBtn" onclick="auAiGen()">${svg(I.bot)}AI tạo kịch bản</button>
+    </div>
+    <div class="inline" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <label style="margin:0;align-self:center;font-size:13px" class="dim">Kịch bản đã lưu:</label>
       <select id="auSaved" style="min-width:200px"><option value="">— chọn —</option></select>
       <button class="btn sm" onclick="auLoadScript()">${svg(I.down)}Nạp</button>
@@ -910,6 +914,13 @@ async function loadSettings(){
      <div class="card" style="padding:22px"><h3 style="margin-top:0">MCP cho AI agent</h3>
        <p class="dim" style="font-size:13px">Cho phép Claude/Cursor quản lý profile qua MCP (stdio cục bộ, không cần token).</p>
        <button class="btn pri" onclick="go('mcp')">${svg(I.bot)}Mở hướng dẫn MCP</button></div>
+     <div class="card" style="padding:22px"><h3 style="margin-top:0">AI dựng kịch bản</h3>
+       <p class="dim" style="font-size:13px">Cấu hình AI để dùng nút <b>✨ AI tạo kịch bản</b> ở màn Automation (tả bằng lời → ra kịch bản). Key lưu cục bộ.</p>
+       <div class="field"><label>Provider</label><select id="sAiProv"><option value="openai" ${s.ai_provider==='openai'?'selected':''}>OpenAI-compatible</option><option value="gemini" ${s.ai_provider==='gemini'?'selected':''}>Gemini</option></select></div>
+       <div class="field"><label>API key</label><input id="sAiKey" type="password" value="${esc(s.ai_key||'')}" placeholder="sk-… (OpenAI) hoặc AIza… (Gemini)"></div>
+       <div class="field"><label>Model</label><input id="sAiModel" value="${esc(s.ai_model||'')}" placeholder="gpt-4o-mini / gemini-2.0-flash"></div>
+       <div class="field"><label>Base URL <span class="dim" style="font-weight:400">(OpenAI-compatible, tuỳ chọn — OpenRouter/local)</span></label><input id="sAiBase" value="${esc(s.ai_base_url||'')}" placeholder="https://api.openai.com/v1"></div>
+     </div>
    </div></div>`;
 }
 async function testApi(){document.getElementById("apiTest").textContent="...";try{const d=await j(`${API}/health`);document.getElementById("apiTest").innerHTML=`<span style="color:var(--ok)">● OK</span> ${d.profiles} profile`;}catch(e){document.getElementById("apiTest").textContent="lỗi";}}
@@ -917,7 +928,8 @@ async function saveSettings(){
   const patch={default_os:val("sOs"),default_browser:val("sBrowser"),default_engine:val("sEngine"),
     headless:document.getElementById("sHeadless").checked,private_server_url:val("sPriv"),
     clear_cache:document.getElementById("sCache").checked,limit_window:document.getElementById("sWin").checked,
-    start_url:val("sUrl"),chrome_params:val("sParams")};
+    start_url:val("sUrl"),chrome_params:val("sParams"),
+    ai_provider:val("sAiProv"),ai_key:val("sAiKey"),ai_model:val("sAiModel"),ai_base_url:val("sAiBase")};
   document.querySelectorAll(".seg").forEach(sg=>{const on=sg.querySelector(".on");if(on)patch[sg.dataset.key]=on.dataset.val;});
   try{await j(`${API}/settings`,body(patch));toast("Đã lưu cài đặt","ok");}catch(e){toast(e.message,"err");}}
 
@@ -1081,6 +1093,14 @@ function viewAppStore(){return `<div class="phead"><h1>App <em>store</em></h1><p
        <span class="dim" style="font-size:12px">${t.steps.length} bước</span></div></div>`).join("")}
   </div>`;}
 function useTemplate(i){STATE.autoSteps=JSON.parse(JSON.stringify(TEMPLATES[i].steps));STATE.autoMode="build";go("automation");toast("Đã nạp kịch bản — chọn profile rồi Chạy","ok");}
+
+/* ----- AI dựng kịch bản từ lời ----- */
+async function auAiGen(){const task=val("auAiTask");if(!task.trim())return toast("Nhập mô tả việc cần làm","err");
+  const b=document.getElementById("auAiBtn");if(b)b.disabled=true;toast("Đang gọi AI dựng kịch bản…","");
+  try{const d=await j(`${API}/ai/workflow`,body({task}));
+    STATE.autoSteps=d.steps||[];STATE.autoMode="build";render();
+    toast(`AI tạo ${(d.steps||[]).length} bước — kiểm tra rồi chạy`,"ok");
+  }catch(e){toast("AI: "+e.message,"err");if(b)b.disabled=false;}}
 
 /* ----- Kịch bản lưu sẵn (Automation) ----- */
 async function loadAuScripts(){try{STATE.auScripts=await j(`${API}/scripts`);}catch(e){STATE.auScripts=[];}
