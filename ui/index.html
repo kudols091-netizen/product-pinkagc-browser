@@ -1431,7 +1431,8 @@ function createTab(bro){
     </div>
     <div class="field" style="margin-top:16px"><label>Engine</label><select id="cEngine"><option value="">auto (Chromium→ovobrowser)</option><option value="ovobrowser">ovobrowser (Chrome, khuyến nghị)</option><option value="camoufox">camoufox (Firefox)</option><option value="fpchromium">fpchromium</option><option value="botbrowser">botbrowser (premium)</option></select></div>
     <div class="field"><label>URL khởi động</label><input id="cUrl" placeholder="https://example.com"></div>
-    <div class="field"><label>Proxy <a style="float:right;color:var(--primary);font-weight:700;cursor:pointer" onclick="useLibPrx()">Chọn từ thư viện</a></label>
+    <div class="field"><label>Proxy</label>
+      ${STATE.proxies.length?`<select id="cProxyLib" onchange="cPickLib(this.value)" style="margin-bottom:8px"><option value="">— chọn từ thư viện (${STATE.proxies.length} proxy đã lưu) —</option>${STATE.proxies.map(x=>{const m=x.meta||{};const dot=m.alive?'🟢':(m.alive===false?'🔴':'⚪');return `<option value="${esc(x.raw_proxy)}">${dot} ${esc((x.raw_proxy||'').split('://').pop())}${m.country?' · '+esc(m.country):''}${m.latency_ms!=null?' · '+m.latency_ms+'ms':''}</option>`;}).join("")}</select>`:''}
       <input id="cProxy" placeholder="host:port:user:pass  (tự nhận http/socks5, trống = không proxy)"></div>
     <button class="btn ghost-pink" onclick="chkCreateProxy()">${svg(I.play)}Kiểm tra proxy</button> <span id="cProxySt" class="dim" style="margin-left:8px">${CT.proxyChk}</span>
     <div style="border-top:1px solid var(--line);margin:18px 0 14px"></div>
@@ -1486,7 +1487,7 @@ function updateSum(){const s=document.getElementById("cSum");if(!s)return;
   const bval=val("cBrowser","Chrome"),b=((STATE.browsers||[]).find(x=>x.value===bval)||{}).label||bval,os=val("cOs","Windows"),pr=val("cProxy")?'Có':'Chưa thiết lập',tz=val("cTz")||'Tự động';
   s.innerHTML=[["Trình duyệt",b],["Hệ điều hành",os],["User-Agent","Tự động"],["Proxy",pr],["Ngôn ngữ","Tự động"],["Múi giờ",tz],["WebRTC","Theo IP"],["GPU","Pool thật (coherent)"],["Màn hình","Tự động"]].map(r=>`<div class="row"><span>${r[0]}</span><span>${esc(r[1])}</span></div>`).join("");}
 function randPreview(){toast("Thông số sẽ random coherent khi tạo","");}
-function useLibPrx(){if(!STATE.proxies.length)return toast("Thư viện proxy trống","");const p=STATE.proxies[0];const e=document.getElementById("cProxy");if(e){e.value=p.raw_proxy;updateSum();}}
+function cPickLib(raw){const e=document.getElementById("cProxy");if(e&&raw){e.value=raw;updateSum();}}
 async function chkCreateProxy(){const raw=val("cProxy");if(!raw)return toast("Nhập proxy","");document.getElementById("cProxySt").textContent="Đang kiểm tra...";try{const d=await j(`${API}/proxy/check`,body({raw_proxy:raw}));CT.proxyChk=d.alive?`● Sống ${d.exit_ip||''} ${d.country||''} ${d.latency_ms}ms`:`● Chết: ${d.error||''}`;document.getElementById("cProxySt").textContent=CT.proxyChk;}catch(e){document.getElementById("cProxySt").textContent=e.message;}}
 async function doCreate(){
   const name=(val("cName")||"").trim(), os=val("cOs","Windows"), browser=val("cBrowser","Chrome"),
