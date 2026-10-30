@@ -327,6 +327,7 @@ const I={
   search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>', up:'<path d="M12 20V8M6 14l6-6 6 6"/>',
   check:'<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-5"/>', dots:'<circle cx="12" cy="6" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="18" r="1"/>',
   shuffle:'<path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/>', copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  cloud:'<path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.5-1A4 4 0 0 0 6 19z"/>', share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>',
 };
 const svg=(d,cls="")=>`<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
@@ -340,6 +341,7 @@ const NAV=[
   {sep:1},
   {id:"automation",label:"Automation",icon:"bot"},
   {id:"appstore",label:"App store",icon:"store"},
+  {id:"cloud",label:"Cloud / Team",icon:"cloud"},
   {id:"developer",label:"Developer",icon:"code"},
   {sep:1},
   {id:"settings",label:"Cài đặt",icon:"gear"},
@@ -422,6 +424,7 @@ function render(){
   else if(v==="log"){el.innerHTML=viewLog();loadLog();}
   else if(v==="developer"){el.innerHTML=viewDeveloper();loadDevHealth();}
   else if(v==="appstore") el.innerHTML=viewAppStore();
+  else if(v==="cloud"){el.innerHTML=viewCloud();loadCloud();}
   else el.innerHTML=viewSoon(v);
 }
 
@@ -490,6 +493,7 @@ function viewProfiles(){
             <button onclick="openProxy('${p.id}')">${svg(I.globe)} Gán proxy</button>
             <button onclick="cloneP('${p.id}')">${svg(I.copy)} Nhân bản</button>
             <button onclick="randP('${p.id}')">${svg(I.shuffle)} Random fingerprint</button>
+            <button onclick="teamShare('${p.id}')">${svg(I.share)} Chia sẻ (team)</button>
             <div class="ksep"></div>
             <button class="danger" onclick="delP('${p.id}','${esc(p.name)}')">${svg(I.trash)} Xoá</button>
           </div>
@@ -954,6 +958,45 @@ function viewAppStore(){return `<div class="phead"><h1>App <em>store</em></h1><p
        <span class="dim" style="font-size:12px">${t.steps.length} bước</span></div></div>`).join("")}
   </div>`;}
 function useTemplate(i){STATE.autoSteps=JSON.parse(JSON.stringify(TEMPLATES[i].steps));STATE.autoMode="build";go("automation");toast("Đã nạp kịch bản — chọn profile rồi Chạy","ok");}
+
+/* ----- Cloud / Team ----- */
+function viewCloud(){return `<div class="phead"><h1>Cloud / <em>Team</em></h1><p>Đồng bộ profile đa máy + chia sẻ đội nhóm qua private server tự host.</p></div>
+  <div id="cloudBody" class="dim" style="padding:18px">Đang tải...</div>`;}
+async function loadCloud(){let s;try{s=await j(`${API}/team/status`);}catch(e){const b=document.getElementById("cloudBody");if(b)b.textContent="Lỗi: "+e.message;return;}
+  const b=document.getElementById("cloudBody");if(!b)return;
+  if(s.logged_in){
+    b.innerHTML=`<div class="split" style="grid-template-columns:1fr 320px;align-items:start">
+      <div class="card" style="padding:24px">
+        <h3 style="margin-top:0"><span class="dot ok"></span> Đã kết nối team</h3>
+        <div style="font-size:14px;margin-top:8px">Server: <b class="mono">${esc(s.url)}</b></div>
+        <div style="font-size:14px;margin-top:4px">Tài khoản: <b>${esc(s.username)}</b></div>
+        <div class="toolbar" style="margin-top:18px">
+          <button class="btn pri" onclick="teamSync(this)">${svg(I.cloud)}Đồng bộ ngay</button>
+          <button class="btn" onclick="teamLogout()">Đăng xuất</button></div>
+        <div id="cloudMsg" class="dim" style="margin-top:12px;font-size:13px"></div>
+        <p class="dim" style="font-size:13px;margin-top:14px;line-height:1.7">Đồng bộ = đẩy profile máy này lên server + kéo profile được chia sẻ về. Chia sẻ từng cái: ở <b>Profiles</b> bấm <b>⋯ → Chia sẻ (team)</b>.</p>
+      </div>
+      <div class="card" style="padding:20px"><h3 style="margin-top:0">Cơ chế</h3>
+        <p class="dim" style="font-size:13px;line-height:1.7">Private server tự host: <code>python -m core.team_server</code>. User đầu tiên = <b>admin</b>. Quyền chia sẻ: <b>read &lt; run &lt; write</b>. Token sống 30 ngày.</p></div>
+    </div>`;
+  } else {
+    b.innerHTML=`<div class="card" style="padding:24px;max-width:470px">
+      <h3 style="margin-top:0">Kết nối Private Server</h3>
+      <div class="field"><label>Server URL</label><input id="tvUrl" value="${esc(s.url||'')}" placeholder="http://ip-vps:8787"></div>
+      <div class="field"><label>Tên đăng nhập</label><input id="tvUser" placeholder="username"></div>
+      <div class="field"><label>Mật khẩu</label><input id="tvPass" type="password" placeholder="password" onkeydown="if(event.key==='Enter')teamLogin()"></div>
+      <div class="toolbar"><button class="btn pri" onclick="teamLogin()">Đăng nhập</button><button class="btn" onclick="teamRegister()">Đăng ký</button></div>
+      <div id="cloudMsg" class="dim" style="margin-top:12px;font-size:13px"></div>
+      <p class="dim" style="font-size:12.5px;margin-top:12px;line-height:1.6">Chưa có server? Chạy <code>python -m core.team_server --host 0.0.0.0 --port 8787</code> trên 1 máy/VPS rồi điền URL vào đây. <b>User đầu tiên đăng ký = admin.</b></p>
+    </div>`;
+  }
+}
+const tvv=id=>(document.getElementById(id)||{}).value||"";
+async function teamLogin(){const m=document.getElementById("cloudMsg");if(m)m.textContent="Đang đăng nhập...";try{await j(`${API}/team/login`,body({url:tvv("tvUrl"),username:tvv("tvUser"),password:tvv("tvPass")}));toast("Đăng nhập team OK","ok");loadCloud();}catch(e){if(m)m.innerHTML=`<span style="color:var(--err)">${esc(e.message)}</span>`;}}
+async function teamRegister(){const m=document.getElementById("cloudMsg");if(m)m.textContent="Đang đăng ký...";try{const d=await j(`${API}/team/register`,body({url:tvv("tvUrl"),username:tvv("tvUser"),password:tvv("tvPass")}));if(m)m.innerHTML=`<span style="color:var(--ok)">Đã tạo <b>${esc(d.username)}</b> (${esc(d.role)}). Bấm Đăng nhập.</span>`;}catch(e){if(m)m.innerHTML=`<span style="color:var(--err)">${esc(e.message)}</span>`;}}
+async function teamLogout(){try{await j(`${API}/team/logout`,body({}));toast("Đã đăng xuất team");loadCloud();}catch(e){toast(e.message,"err");}}
+async function teamSync(btn){const m=document.getElementById("cloudMsg");if(m)m.textContent="Đang đồng bộ...";if(btn)btn.disabled=true;try{const d=await j(`${API}/team/sync`,body({}));if(m)m.innerHTML=`<span style="color:var(--ok)">● Xong — đẩy ${d.pushed}, kéo về ${d.pulled} profile</span>`;refresh();}catch(e){if(m)m.innerHTML=`<span style="color:var(--err)">${esc(e.message)}</span>`;}if(btn)btn.disabled=false;}
+async function teamShare(pid){const name=(STATE.profiles.find(p=>p.id===pid)||{}).name||pid;const u=prompt(`Chia sẻ profile "${name}" cho ai? (username trên team server)`);if(!u)return;const perm=(prompt("Quyền: read / run / write","read")||"").trim();if(!perm)return;try{await j(`${API}/team/share`,body({profile_id:pid,username:u.trim(),permission:perm}));toast(`Đã chia sẻ cho ${u.trim()} (${perm})`,"ok");}catch(e){toast(e.message,"err");}}
 
 function viewSoon(v){const t={plugins:"Plugins"}[v]||v;
   return `<div class="phead"><h1>${esc(t)}</h1></div><div class="card"><div class="empty"><img src="mascot.png" onerror="this.style.display='none'"><h3>${esc(t)}</h3><p>Màn hình này đang được hoàn thiện.</p><span class="soon">Sắp ra mắt</span></div></div>`;}

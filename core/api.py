@@ -86,7 +86,7 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
     _DEFAULT_SETTINGS = {
         # chung
         "default_os": "Windows", "default_browser": "Chrome", "default_engine": "", "headless": False,
-        "private_server_url": "",
+        "private_server_url": "", "team_token": "", "team_user": "",
         # trình duyệt — mode fingerprint mặc định khi tạo profile
         "canvas": "Noise", "client_rect": "Noise", "webgl": "Noise", "webgl_meta": "Masked",
         "audio": "Noise", "font": "Masked", "screen": "Real", "language": "Base on IP",
@@ -622,6 +622,92 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             threading.Timer(1.5, lambda: _os._exit(0)).start()   # thoát để _update.bat thay exe
             return _ok({"ok": True, "message": msg, "latest": info.get("latest")})
         return _err(msg)
+
+    # ---- Cloud / Team sync (dùng team_server tự host làm "private server") ----
+    def _team():
+        """Trả (TeamClient, settings). Raise nếu chưa cấu hình URL."""
+        s = _load_settings()
+        url = (s.get("private_server_url") or "").strip()
+        if not url:
+            raise RuntimeError("Chưa cấu hình Private server URL ở Cài đặt.")
+        from .team_client import TeamClient
+        return TeamClient(url, s.get("team_token") or None), s
+
+    @app.get("/api/v3/team/status")
+    def team_status():
+        s = _load_settings()
+        return _ok({"url": s.get("private_server_url", ""), "logged_in": bool(s.get("team_token")),
+                    "username": s.get("team_user", "")})
+
+    @app.post("/api/v3/team/login")
+    def team_login():
+        b = request.get_json(silent=True) or {}
+        if b.get("url"):
+            _save_settings({"private_server_url": str(b["url"]).strip()})
+        try:
+            c, _ = _team()
+        except RuntimeError as e:
+            return _err(str(e))
+        try:
+            r = c.login(b.get("username", ""), b.get("password", ""))
+        except Exception as e:  # noqa: BLE001
+            return _err(f"Không kết nối server: {e}")
+        if not r.get("success"):
+            return _err(r.get("message", "Sai tài khoản/mật khẩu"), 401)
+        _save_settings({"team_token": c.token, "team_user": b.get("username", "")})
+        return _ok({"username": b.get("username", ""), "role": (r.get("data") or {}).get("role")})
+
+    @app.post("/api/v3/team/register")
+    def team_register():
+        b = request.get_json(silent=True) or {}
+        if b.get("url"):
+            _save_settings({"private_server_url": str(b["url"]).strip()})
+        try:
+            c, _ = _team()
+        except RuntimeError as e:
+            return _err(str(e))
+        try:
+            r = c.register(b.get("username", ""), b.get("password", ""))
+        except Exception as e:  # noqa: BLE001
+            return _err(f"Không kết nối server: {e}")
+        return _ok(r.get("data")) if r.get("success") else _err(r.get("message", "Đăng ký lỗi"))
+
+    @app.post("/api/v3/team/logout")
+    def team_logout():
+        _save_settings({"team_token": "", "team_user": ""})
+        return _ok({"logged_out": True})
+
+    @app.post("/api/v3/team/sync")
+    def team_sync():
+        try:
+            c, _ = _team()
+        except RuntimeError as e:
+            return _err(str(e))
+        if not c.token:
+            return _err("Chưa đăng nhập team.", 401)
+        from .team_client import sync_down, sync_up
+        try:
+            up = sync_up(db, c)
+            down = sync_down(db, c)
+        except Exception as e:  # noqa: BLE001
+            return _err(f"Sync lỗi: {e}")
+        log_event("team", f"sync up {up.get('pushed',0)} / down {down}")
+        return _ok({"pushed": up.get("pushed", 0), "pulled": down})
+
+    @app.post("/api/v3/team/share")
+    def team_share():
+        b = request.get_json(silent=True) or {}
+        try:
+            c, _ = _team()
+        except RuntimeError as e:
+            return _err(str(e))
+        if not c.token:
+            return _err("Chưa đăng nhập team.", 401)
+        try:
+            r = c.share(b.get("profile_id", ""), b.get("username", ""), b.get("permission", "read"))
+        except Exception as e:  # noqa: BLE001
+            return _err(f"Không kết nối server: {e}")
+        return _ok(r.get("data")) if r.get("success") else _err(r.get("message", "Share lỗi"), 403)
 
     return app
 

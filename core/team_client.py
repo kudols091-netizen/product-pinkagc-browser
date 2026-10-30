@@ -6,6 +6,7 @@ sync_up  : push profile local -> server (owner = user đang đăng nhập).
 from __future__ import annotations
 
 import json
+import urllib.error
 import urllib.request
 from typing import Any, Callable, Optional
 
@@ -23,8 +24,14 @@ def _http_transport(base_url: str) -> Transport:
                                      headers={"Content-Type": "application/json"})
         if token:
             req.add_header("Authorization", f"Bearer {token}")
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return json.loads(r.read().decode())
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:          # 4xx/5xx vẫn trả JSON {success:false} thay vì raise
+            try:
+                return json.loads(e.read().decode())
+            except Exception:                        # noqa: BLE001
+                return {"success": False, "message": f"HTTP {e.code}"}
     return t
 
 
