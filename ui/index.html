@@ -1561,7 +1561,13 @@ function linkLabels(){
     let lab=field?field.querySelector(':scope > label, label'):null;
     if(!lab){const p=el.previousElementSibling;if(p&&p.tagName==='LABEL')lab=p;}
     if(lab&&!lab.htmlFor){lab.htmlFor=el.id;}
-    else if(!lab){const t=(el.placeholder||el.title||'').trim();if(t)el.setAttribute('aria-label',t);}
+    else if(!lab){
+      let t=(el.placeholder||el.title||'').trim();
+      if(!t&&el.tagName==='SELECT'){const o=el.querySelector('option');t=(o?o.textContent:'').replace(/[-—\s]+/g,' ').trim();}  // select: lấy option đầu làm tên
+      if(!t&&el.type==='file')t='Chọn tệp';
+      if(!t&&(el.type==='checkbox'||el.type==='radio'))t=el.classList.contains('rowchk')?'Chọn dòng':(el.closest('thead')?'Chọn tất cả':'Chọn');
+      if(t)el.setAttribute('aria-label',t);
+    }
   });
 }
 (function(){const o=new MutationObserver(()=>{clearTimeout(window._lblT);window._lblT=setTimeout(linkLabels,80);});
