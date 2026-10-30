@@ -112,6 +112,8 @@ def serve(profile_fp: dict, profile_dyn: dict, profiles_root: str | Path, *,
     exts = [e for e in ((profile_dyn or {}).get("extensions") or []) if Path(e).is_dir()]
     if exts:                                      # nạp extension unpacked (--headless=new hỗ trợ)
         args += [f"--load-extension={','.join(exts)}", f"--disable-extensions-except={','.join(exts)}"]
+    if (profile_dyn or {}).get("save_bandwidth"):          # tiết kiệm băng thông: chặn tải ảnh (farm nhiều nick)
+        args.append("--blink-settings=imagesEnabled=false")
     args += [a for a in str((profile_dyn or {}).get("chrome_params") or "").split() if a]   # flag tuỳ chỉnh
     starturls = [u for u in str((profile_dyn or {}).get("start_url") or "").split() if u]    # URL khởi động
     proc = subprocess.Popen([binary, *args, *starturls], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

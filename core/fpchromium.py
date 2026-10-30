@@ -102,6 +102,8 @@ def serve(profile_fp: dict, profile_dyn: dict, profiles_root: str | Path, *,
     exts = [e for e in ((profile_dyn or {}).get("extensions") or []) if Path(e).is_dir()]
     if exts:
         args += [f"--load-extension={','.join(exts)}", f"--disable-extensions-except={','.join(exts)}"]
+    if (profile_dyn or {}).get("save_bandwidth"):          # tiết kiệm băng thông: chặn tải ảnh
+        args.append("--blink-settings=imagesEnabled=false")
     args += [a for a in str((profile_dyn or {}).get("chrome_params") or "").split() if a]
     args += [u for u in str((profile_dyn or {}).get("start_url") or "").split() if u]        # URL khởi động
     if os.environ.get("FPC_DEBUG"):

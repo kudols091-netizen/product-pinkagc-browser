@@ -489,6 +489,20 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             return _err(msg, code)
         return _ok(res)
 
+    @app.post("/api/v3/profiles/<pid>/options")
+    def profile_options(pid: str):
+        """Merge cờ hành vi vào dynamic_data (vd save_bandwidth = chặn ảnh tiết kiệm băng thông)."""
+        p = db.get_profile(pid)
+        if not p:
+            return _err("profile not found", 404)
+        b = request.get_json(silent=True) or {}
+        dyn = p.dynamic_data or {}
+        for k in ("save_bandwidth",):                 # whitelist cờ cho phép set
+            if k in b:
+                dyn[k] = bool(b[k])
+        db.set_dynamic_data(pid, dyn)
+        return _ok({"id": pid, "save_bandwidth": dyn.get("save_bandwidth", False)})
+
     # ---- Scripts (kịch bản lưu sẵn) ----
     @app.get("/api/v3/scripts")
     def scripts_list():

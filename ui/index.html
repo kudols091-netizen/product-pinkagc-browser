@@ -1260,7 +1260,8 @@ function createTab(bro){
       <div style="flex:1"><label>Ghi chú</label><input id="cNote" placeholder="ghi chú ngắn"></div>
       <div><label>Màu nhãn</label><input id="cColor" type="color" value="#EA1A87" style="height:42px;padding:4px;width:58px"></div>
     </div>
-    <div class="checkline" style="margin-top:14px"><label class="toggle"><input id="cPin" type="checkbox"><span></span></label> Ghim lên đầu</div>`)
+    <div class="checkline" style="margin-top:14px"><label class="toggle"><input id="cPin" type="checkbox"><span></span></label> Ghim lên đầu</div>
+    <div class="checkline"><label class="toggle"><input id="cBandwidth" type="checkbox"><span></span></label> Tiết kiệm băng thông <span class="dim" style="font-size:12px">(chặn tải ảnh — farm nhiều nick, đỡ tốn proxy)</span></div>`)
   + P("ketnoi",`
     <div class="field"><label>WebRTC</label><select><option>Base on IP (khuyến nghị)</option><option>Disable</option><option>Real</option></select></div>
     <div class="field"><label>Geolocation</label><select><option>Auto theo IP</option><option>Prompt</option><option>Block</option></select></div>
@@ -1303,12 +1304,14 @@ async function doCreate(){
   // meta chung (tags/note/màu/ghim) áp cho mọi profile tạo ra
   const tags=val("cTags").split(",").map(t=>t.trim()).filter(Boolean);
   const color=val("cColor"), note=val("cNote"), pinned=document.getElementById("cPin")?.checked;
+  const bandwidth=document.getElementById("cBandwidth")?.checked;
   const hasMeta=tags.length||note||pinned||(color&&color.toLowerCase()!=="#ea1a87");
   const applyExtras=async pid=>{
     if(proxy) await j(`${API}/profiles/${pid}/proxy`,body({raw_proxy:proxy})).catch(()=>{});
     if(tz) await j(`${API}/profiles/${pid}/timezone`,body({timezone:tz})).catch(()=>{});
     if(cookies.trim()) await j(`${API}/profiles/${pid}/cookies`,body({cookies})).catch(()=>{});
     if(hasMeta) await j(`${API}/profiles/${pid}/meta`,body({tags,note,color,pinned})).catch(()=>{});
+    if(bandwidth) await j(`${API}/profiles/${pid}/options`,body({save_bandwidth:true})).catch(()=>{});
   };
   try{
     if(count>1){
