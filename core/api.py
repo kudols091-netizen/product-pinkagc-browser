@@ -553,6 +553,43 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         except Exception as e:  # noqa: BLE001
             return _err(f"không mở được hộp chọn file: {e}", 500)
 
+    def _find_ffmpeg() -> str | None:
+        import shutil
+        f = shutil.which("ffmpeg")
+        if f:
+            return f
+        for cand in ("ffmpeg.exe", "vendor/ffmpeg/ffmpeg.exe", "vendor/ffmpeg.exe"):
+            if Path(cand).is_file():
+                return str(Path(cand).resolve())
+        return None
+
+    @app.post("/api/v3/convert-media")
+    def convert_media():
+        """Convert video->.y4m hoặc audio->.wav bằng ffmpeg (cho camera/mic giả). Output vào asset/media/."""
+        import subprocess
+        b = request.get_json(silent=True) or {}
+        src, to = b.get("path", ""), b.get("to", "y4m")
+        if not src or not Path(src).is_file():
+            return _err("file không tồn tại")
+        if Path(src).suffix.lower().lstrip(".") == to.lower():
+            return _ok({"path": src, "converted": False})       # đã đúng định dạng
+        ff = _find_ffmpeg()
+        if not ff:
+            return _err("Chưa có ffmpeg để convert. Cài ffmpeg (ffmpeg.org) rồi thử lại, "
+                        "hoặc tự convert sang .y4m/.wav.", 400)
+        media = Path(profiles_root).parent / "media"
+        media.mkdir(parents=True, exist_ok=True)
+        out = media / (Path(src).stem + "." + to)
+        cmd = ([ff, "-y", "-i", src, "-pix_fmt", "yuv420p", str(out)] if to == "y4m"
+               else [ff, "-y", "-i", src, str(out)])
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        except Exception as e:  # noqa: BLE001
+            return _err(f"convert lỗi: {e}", 500)
+        if r.returncode != 0 or not out.is_file():
+            return _err("convert thất bại: " + (r.stderr or "")[-300:], 500)
+        return _ok({"path": str(out), "converted": True})
+
     @app.post("/api/v3/ai/workflow")
     def ai_workflow():
         """Sinh kịch bản automation từ lời. Đọc provider/key ở settings."""
