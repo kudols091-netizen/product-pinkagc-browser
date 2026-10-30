@@ -528,11 +528,13 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         for k in ("save_bandwidth",):                 # whitelist cờ bool
             if k in b:
                 dyn[k] = bool(b[k])
-        if "engine_version" in b:                      # khoá version engine cho profile
-            dyn["engine_version"] = str(b["engine_version"] or "")
+        for k in ("engine_version", "fake_camera"):    # cờ chuỗi (version engine / video camera giả .y4m)
+            if k in b:
+                dyn[k] = str(b[k] or "")
         db.set_dynamic_data(pid, dyn)
         return _ok({"id": pid, "save_bandwidth": dyn.get("save_bandwidth", False),
-                    "engine_version": dyn.get("engine_version", "")})
+                    "engine_version": dyn.get("engine_version", ""),
+                    "fake_camera": dyn.get("fake_camera", "")})
 
     @app.post("/api/v3/ai/workflow")
     def ai_workflow():

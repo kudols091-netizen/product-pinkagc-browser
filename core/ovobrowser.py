@@ -115,6 +115,11 @@ def serve(profile_fp: dict, profile_dyn: dict, profiles_root: str | Path, *,
         args += [f"--load-extension={','.join(exts)}", f"--disable-extensions-except={','.join(exts)}"]
     if (profile_dyn or {}).get("save_bandwidth"):          # tiết kiệm băng thông: chặn tải ảnh (farm nhiều nick)
         args.append("--blink-settings=imagesEnabled=false")
+    fc = (profile_dyn or {}).get("fake_camera")            # camera giả: feed video .y4m vào getUserMedia (KYC/liveness)
+    if fc:
+        args += ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]
+        if Path(fc).is_file():
+            args.append(f"--use-file-for-fake-video-capture={fc}")
     args += [a for a in str((profile_dyn or {}).get("chrome_params") or "").split() if a]   # flag tuỳ chỉnh
     starturls = [u for u in str((profile_dyn or {}).get("start_url") or "").split() if u]    # URL khởi động
     proc = subprocess.Popen([binary, *args, *starturls], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
