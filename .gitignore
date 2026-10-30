@@ -18,3 +18,5 @@ _screenshots/
 dist/
 build/_pyi/
 build/*.spec
+*.spec
+build/PinkAgcBrowser/
