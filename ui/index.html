@@ -449,6 +449,7 @@ function render(){
   else if(v==="appstore") el.innerHTML=viewAppStore();
   else if(v==="cloud"){el.innerHTML=viewCloud();loadCloud();}
   else el.innerHTML=viewSoon(v);
+  linkLabels();   // gán label ngay trong cùng tick render -> không còn khoảng transient thiếu label
 }
 
 /* ----- Trang chủ (welcome) ----- */
@@ -1299,7 +1300,7 @@ function openCreate(){CT={tab:"nhanh",proxyChk:""};renderCreate();show(true);
     sel.innerHTML='<option value="">Mặc định (gói sẵn)</option>'+((d&&d.installed)||[]).filter(e=>!e.builtin).map(e=>`<option value="${esc(e.version)}">Chrome ${esc(e.version)}</option>`).join("");
     sel.value=cur;toggleAdv('c');
   }).catch(()=>{});}
-function show(on){document.getElementById("overlay").classList.toggle("show",on);if(!on)document.getElementById("overlay").innerHTML="";}
+function show(on){document.getElementById("overlay").classList.toggle("show",on);if(!on)document.getElementById("overlay").innerHTML="";else linkLabels();}
 function renderCreate(){
   const bro=STATE.browsers.length?STATE.browsers.map(b=>`<option value="${b.value}">${esc(b.label)} (${b.engine})</option>`).join(""):'<option value="Chrome">Chrome</option>';
   const tabs=[["nhanh","Thao tác nhanh"],["ketnoi","Kết nối"],["hardware","Phần cứng"],["software","Phần mềm"],["cookies","Cookies"]];
