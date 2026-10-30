@@ -1,45 +1,165 @@
 """Automation runner — chạy kịch bản no-code trên profile qua CDP (+ OpenCV image-match).
 
-Kịch bản = list step dict (JSON), ví dụ:
+Kịch bản = list step dict (JSON). Mỗi step có "action" + tham số. Hỗ trợ:
+  - Biến {{var}}: mọi tham số chuỗi được thay {{name}} bằng giá trị biến (set_var/extract/http…).
+  - Control-flow lồng nhau: loop{times,body}, foreach{var,file|list,body}, while_exists{selector,body},
+    if{selector|left/op/right, then, else}, stop, throw.
+  - Retry per-step: "retry": N (thử lại khi lỗi). Timeout per-step: "timeout": ms.
+Ví dụ:
   [{"action":"goto","url":"https://x.com"},
-   {"action":"waitfor","selector":"#user"},
-   {"action":"type","selector":"#user","text":"acc1"},
-   {"action":"image_click","template":"login_btn.png","threshold":0.85},
-   {"action":"extract","selector":".balance","as":"bal"}]
+   {"action":"foreach","file":"accs.txt","var":"acc","body":[
+       {"action":"type","selector":"#u","text":"{{acc}}"},
+       {"action":"gen_2fa","secret":"JBSWY...","as":"otp"},
+       {"action":"type","selector":"#otp","text":"{{otp}}"}]}]
 
-validate_script() thuần (test được không cần browser). run_script() nối Playwright qua CDP endpoint
-(lấy từ engines.serve) và thực thi. image_click = OpenCV template-match trên screenshot rồi click toạ độ.
+validate_script() thuần (test được không cần browser). run_script() nối Playwright qua CDP và thực thi.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
-# action -> tuple các key bắt buộc
+# action -> tuple các key BẮT BUỘC. Control-flow có body/then/else được validate đệ quy.
 _ACTIONS: dict[str, tuple[str, ...]] = {
+    # --- Browser ---
     "goto": ("url",), "click": ("selector",), "type": ("selector", "text"),
-    "fill": ("selector", "text"), "wait": ("ms",), "waitfor": ("selector",),
-    "press": ("key",), "scroll": (), "screenshot": (), "eval": ("js",),
-    "extract": ("selector",), "image_click": ("template",),
+    "fill": ("selector", "text"), "human_type": ("selector", "text"), "clear": ("selector",),
+    "hover": ("selector",), "dblclick": ("selector",), "rightclick": ("selector",),
+    "select": ("selector",), "check": ("selector",), "press": ("key",),
+    "uploadfile": ("selector", "path"), "scroll": (), "scrollto": ("selector",),
+    "wait": ("ms",), "waitfor": ("selector",), "waittext": ("text",), "waiturl": ("contains",),
+    "screenshot": (), "eval": ("js",), "extract": ("selector",), "getattr": ("selector", "attr"),
+    "geturl": (), "gettitle": (), "exists": ("selector",), "count": ("selector",),
+    "newtab": ("url",), "switchtab": ("index",), "closetab": (), "reload": (), "goback": (),
+    "getcookies": (), "setcookie": ("name", "value"), "image_click": ("template",),
+    # --- Data / biến ---
+    "set_var": ("var", "value"), "inc_var": ("var",), "math": ("expr",),
+    "http_request": ("url",), "parse_json": ("input", "path"), "regex": ("input", "pattern"),
+    "random_data": ("kind",), "random_number": (), "random_line": ("path",),
+    "read_file": ("path",), "write_file": ("path", "content"), "split_text": ("input", "sep"),
+    # --- Logic (control-flow) ---
+    "if": (), "loop": ("times",), "foreach": ("var",), "while_exists": ("selector",),
+    "stop": (), "throw": (), "log": ("message",), "comment": (),
+    # --- Account ---
+    "gen_2fa": ("secret",), "telegram": ("token", "chatid", "message"),
+    "solve_captcha": ("apikey",),
 }
+_BODY_KEYS = ("body", "then", "else")          # key chứa list step con -> validate đệ quy
 
 
-def validate_script(steps: list[dict]) -> list[str]:
-    """Trả list lỗi (rỗng = hợp lệ)."""
-    errs = []
+def validate_script(steps: Any, _path: str = "") -> list[str]:
+    """Trả list lỗi (rỗng = hợp lệ). Đệ quy vào body/then/else của control-flow."""
+    errs: list[str] = []
     if not isinstance(steps, list):
-        return ["script phải là list step"]
+        return [f"script{(' ' + _path) if _path else ''} phải là list step"]
     for i, s in enumerate(steps):
+        at = f"{_path}step {i}"
         if not isinstance(s, dict) or "action" not in s:
-            errs.append(f"step {i}: thiếu 'action'"); continue
+            errs.append(f"{at}: thiếu 'action'"); continue
         act = s["action"]
         if act not in _ACTIONS:
-            errs.append(f"step {i}: action không hỗ trợ {act!r} ({list(_ACTIONS)})"); continue
+            errs.append(f"{at}: action không hỗ trợ {act!r} ({list(_ACTIONS)})"); continue
         for k in _ACTIONS[act]:
             if k not in s:
-                errs.append(f"step {i} ({act}): thiếu '{k}'")
+                errs.append(f"{at} ({act}): thiếu '{k}'")
+        for bk in _BODY_KEYS:
+            if bk in s:
+                errs += validate_script(s[bk], f"{at}>{bk} ")
     return errs
 
+
+# ---------------------------------------------------------------- biến + helper thuần
+
+_VAR_RE = re.compile(r"\{\{\s*([\w.]+)\s*\}\}")
+
+
+def _subst(text: Any, vars: dict) -> str:
+    """Thay {{name}} bằng str(vars[name]) (rỗng nếu thiếu). Không phải chuỗi -> str()."""
+    s = text if isinstance(text, str) else str(text)
+    return _VAR_RE.sub(lambda m: str(vars.get(m.group(1), "")), s)
+
+
+def _totp(secret: str, t: float | None = None, digits: int = 6, period: int = 30) -> str:
+    """TOTP RFC-6238 (SHA1) — sinh mã 2FA từ secret Base32. Thuần stdlib, không cần lib."""
+    import base64
+    import hashlib
+    import hmac
+    import struct
+    import time
+    key_s = re.sub(r"\s", "", secret).upper()
+    key_s += "=" * (-len(key_s) % 8)
+    key = base64.b32decode(key_s, casefold=True)
+    counter = int((time.time() if t is None else t) // period)
+    mac = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    off = mac[-1] & 0x0F
+    code = (struct.unpack(">I", mac[off:off + 4])[0] & 0x7FFFFFFF) % (10 ** digits)
+    return str(code).zfill(digits)
+
+
+def _random_data(kind: str, arg: str = "") -> str:
+    """Sinh dữ liệu ngẫu nhiên: name/firstname/lastname/email/username/password/number/string/uuid/phone."""
+    import random
+    import string
+    import uuid
+    fn = ["an", "binh", "chi", "dung", "giang", "ha", "hoa", "khanh", "linh", "minh", "nam", "oanh", "phuc", "quan", "trang"]
+    ln = ["nguyen", "tran", "le", "pham", "hoang", "vu", "dang", "bui", "do", "ho"]
+    def _len(default: int) -> int:
+        if "-" in arg:
+            a, b = arg.split("-", 1)
+            return random.randint(int(a), int(b))
+        return int(arg) if arg.isdigit() else default
+    k = kind.lower()
+    if k == "firstname": return random.choice(fn)
+    if k == "lastname": return random.choice(ln)
+    if k == "name": return f"{random.choice(ln)} {random.choice(fn)}"
+    if k == "username": return random.choice(fn) + str(random.randint(100, 99999))
+    if k == "email":
+        dom = arg or random.choice(["gmail.com", "hotmail.com", "outlook.com"])
+        return random.choice(fn) + str(random.randint(100, 99999)) + "@" + dom
+    if k == "password":
+        pool = string.ascii_letters + string.digits + "!@#$%"
+        return "".join(random.choice(pool) for _ in range(_len(12)))
+    if k == "string":
+        return "".join(random.choice(string.ascii_lowercase) for _ in range(_len(10)))
+    if k == "number":
+        return str(random.randint(0, 10 ** _len(6) - 1))
+    if k == "uuid": return uuid.uuid4().hex
+    if k == "phone": return "09" + "".join(random.choice("0123456789") for _ in range(8))
+    return ""
+
+
+def _json_path(obj: Any, path: str) -> Any:
+    """Lấy giá trị theo path 'a.b.0.c' từ dict/list."""
+    cur = obj
+    for part in path.split("."):
+        if part == "":
+            continue
+        if isinstance(cur, list):
+            cur = cur[int(part)]
+        elif isinstance(cur, dict):
+            cur = cur.get(part)
+        else:
+            return None
+    return cur
+
+
+def _compare(left: str, op: str, right: str) -> bool:
+    """So sánh biến cho action if: == != > >= < <= contains empty notempty."""
+    if op == "empty": return left.strip() == ""
+    if op == "notempty": return left.strip() != ""
+    if op == "contains": return right in left
+    try:                                             # so sánh số nếu cả hai là số ("6.0" == "6")
+        a: Any = float(left); b: Any = float(right)
+    except ValueError:
+        a, b = left, right
+    if op in ("==", "!="):
+        eq = a == b
+        return eq if op == "==" else not eq
+    return {">": a > b, ">=": a >= b, "<": a < b, "<=": a <= b}.get(op, False)
+
+
+# ---------------------------------------------------------------- browser helpers
 
 def _image_click(page: Any, template_path: str, threshold: float, workdir: Path) -> bool:
     """OpenCV template-match template trên screenshot trang -> click tâm match nếu >= threshold."""
@@ -59,6 +179,17 @@ def _image_click(page: Any, template_path: str, threshold: float, workdir: Path)
     dpr = page.evaluate("window.devicePixelRatio") or 1
     page.mouse.click((maxloc[0] + w / 2) / dpr, (maxloc[1] + h / 2) / dpr)
     return True
+
+
+def _elem_exists(page: Any, selector: str, timeout_ms: int) -> bool:
+    """Phần tử có xuất hiện trong timeout không (0 = kiểm tra ngay)."""
+    try:
+        if timeout_ms > 0:
+            page.wait_for_selector(selector, timeout=timeout_ms)
+            return True
+        return page.query_selector(selector) is not None
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _connect(pw: Any, engine: str, ws_endpoint: str) -> Any:
@@ -82,6 +213,290 @@ def inject_cookies(ws_endpoint: str, cookies: list[dict], *, engine: str = "chro
     return len(cookies)
 
 
+# ---------------------------------------------------------------- engine thực thi
+
+class _Ctx:
+    """Trạng thái chạy: biến, log, data, workdir, trình duyệt + chặn vòng lặp vô hạn."""
+    def __init__(self, browser: Any, page: Any, workdir: Path, timeout: int):
+        self.browser, self.page, self.workdir, self.timeout = browser, page, workdir, timeout
+        self.vars: dict[str, Any] = {}
+        self.log: list[str] = []
+        self.data: dict[str, Any] = {}
+        self.count = 0
+        self.max_steps = 200_000           # ponytail: trần chống loop vô hạn; nâng nếu cần script dài
+
+
+class _Stop(Exception):
+    """stop action -> dừng sạch cả kịch bản (ok=True)."""
+
+
+def _foreach_items(s: dict, ctx: _Ctx) -> list[str]:
+    """Nguồn foreach: file (mỗi dòng 1 mục) hoặc list/text ({{var}} nhiều dòng)."""
+    if s.get("file"):
+        p = Path(_subst(s["file"], ctx.vars))
+        p = p if p.is_absolute() else ctx.workdir / p
+        return [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    raw = _subst(s.get("list", s.get("text", "")), ctx.vars)
+    return [ln for ln in raw.splitlines() if ln.strip()]
+
+
+def _run_steps(steps: list[dict], ctx: _Ctx) -> None:
+    """Chạy list step (đệ quy vào control-flow). Ném _Stop khi gặp stop."""
+    page = ctx.page
+    for i, s in enumerate(steps):
+        ctx.count += 1
+        if ctx.count > ctx.max_steps:
+            raise RuntimeError("vượt trần số step (vòng lặp vô hạn?)")
+        act = s["action"]
+        # --- control-flow ---
+        if act == "comment":
+            continue
+        if act == "stop":
+            ctx.log.append("stop"); raise _Stop
+        if act == "throw":
+            raise RuntimeError(_subst(s.get("message", "throw"), ctx.vars))
+        if act == "log":
+            ctx.log.append(_subst(s.get("message", ""), ctx.vars)); continue
+        if act == "if":
+            if "selector" in s:
+                ok = _elem_exists(page, _subst(s["selector"], ctx.vars), int(s.get("timeout", 0)))
+                if str(s.get("negate", "")).lower() == "true":
+                    ok = not ok
+            else:
+                ok = _compare(_subst(s.get("left", ""), ctx.vars), str(s.get("op", "==")),
+                              _subst(s.get("right", ""), ctx.vars))
+            _run_steps(s.get("then" if ok else "else", []) or [], ctx)
+            continue
+        if act == "loop":
+            n = int(float(_subst(s.get("times", 1), ctx.vars) or 1))
+            var = s.get("var", "loopIndex")
+            for k in range(max(0, n)):
+                ctx.vars[var] = k
+                _run_steps(s.get("body", []) or [], ctx)
+            continue
+        if act == "foreach":
+            var, iv = s.get("var", "item"), s.get("indexVar", "loopIndex")
+            for k, it in enumerate(_foreach_items(s, ctx)):
+                ctx.vars[var] = it; ctx.vars[iv] = k
+                _run_steps(s.get("body", []) or [], ctx)
+            continue
+        if act == "while_exists":
+            mx, var, k = int(s.get("max", 50)), s.get("var", "loopIndex"), 0
+            while k < mx and _elem_exists(page, _subst(s["selector"], ctx.vars), 0):
+                ctx.vars[var] = k
+                _run_steps(s.get("body", []) or [], ctx)
+                k += 1
+            continue
+        # --- leaf: có retry ---
+        tries = int(s.get("retry", 0) or 0) + 1
+        if s.get("timeout"):
+            page.set_default_timeout(int(s["timeout"]))
+        for attempt in range(tries):
+            try:
+                _exec_leaf(s, ctx, i); break
+            except Exception as e:  # noqa: BLE001
+                if attempt + 1 >= tries:
+                    raise
+                ctx.log.append(f"step {i} retry {attempt + 1}: {e}")
+        else:
+            continue
+        ctx.log.append(f"step {i} ok: {act}")
+
+
+def _exec_leaf(s: dict, ctx: _Ctx, i: int) -> None:
+    """Thực thi 1 action lá (không control-flow). Ghi biến vào ctx.vars/ctx.data."""
+    page, v, wd = ctx.page, ctx.vars, ctx.workdir
+    act = s["action"]
+    def g(key: str, default: str = "") -> str:  # tham số chuỗi + thay {{var}}
+        return _subst(s.get(key, default), v)
+    def save(name: str, val: Any) -> None:
+        v[name] = val; ctx.data[name] = val
+
+    # ---- Browser
+    if act == "goto": page.goto(g("url"), wait_until=s.get("wait_until", "load"))
+    elif act == "click": page.click(g("selector"))
+    elif act == "type": page.type(g("selector"), g("text"))
+    elif act == "fill": page.fill(g("selector"), g("text"))
+    elif act == "human_type":
+        page.click(g("selector"))
+        page.type(g("selector"), g("text"), delay=int(s.get("delay", 90)))   # gõ chậm như người
+    elif act == "clear": page.fill(g("selector"), "")
+    elif act == "hover": page.hover(g("selector"))
+    elif act == "dblclick": page.dblclick(g("selector"))
+    elif act == "rightclick": page.click(g("selector"), button="right")
+    elif act == "select":
+        val = g("value")
+        page.select_option(g("selector"), value=(val or None))
+    elif act == "check":
+        (page.check if g("state", "check") != "uncheck" else page.uncheck)(g("selector"))
+    elif act == "press": page.keyboard.press(g("key"))
+    elif act == "uploadfile": page.set_input_files(g("selector"), g("path"))
+    elif act == "scroll": page.mouse.wheel(int(s.get("x", 0)), int(s.get("y", 600)))
+    elif act == "scrollto": page.query_selector(g("selector")).scroll_into_view_if_needed()
+    elif act == "wait": page.wait_for_timeout(int(float(g("ms", "0") or 0)))
+    elif act == "waitfor": page.wait_for_selector(g("selector"))
+    elif act == "waittext": page.wait_for_selector(f"text={g('text')}")
+    elif act == "waiturl": page.wait_for_url(f"**{g('contains')}**")
+    elif act == "screenshot": page.screenshot(path=str(wd / (g("path") or f"shot_{i}.png")),
+                                              full_page=str(s.get("full", "")).lower() == "true")
+    elif act == "eval": save(s.get("as", f"eval_{i}"), page.evaluate(s["js"]))
+    elif act == "extract":
+        el = page.query_selector(g("selector"))
+        val = (el.get_attribute(s["attr"]) if s.get("attr") else el.inner_text()) if el else None
+        save(s.get("as", f"extract_{i}"), val)
+    elif act == "getattr":
+        el = page.query_selector(g("selector"))
+        save(s.get("as", f"attr_{i}"), el.get_attribute(g("attr")) if el else None)
+    elif act == "geturl": save(s.get("as", "url"), page.url)
+    elif act == "gettitle": save(s.get("as", "title"), page.title())
+    elif act == "exists": save(s.get("as", "exists"), page.query_selector(g("selector")) is not None)
+    elif act == "count": save(s.get("as", "count"), len(page.query_selector_all(g("selector"))))
+    elif act == "newtab": ctx.page = page.context.new_page(); ctx.page.goto(g("url"))
+    elif act == "switchtab":
+        pages = page.context.pages
+        ctx.page = pages[min(int(g("index", "0") or 0), len(pages) - 1)]; ctx.page.bring_to_front()
+    elif act == "closetab":
+        page.close()
+        ctx.page = page.context.pages[-1] if page.context.pages else page.context.new_page()
+    elif act == "reload": page.reload()
+    elif act == "goback": page.go_back()
+    elif act == "getcookies":
+        cs = page.context.cookies()
+        if s.get("name"): cs = [c for c in cs if c.get("name") == g("name")]
+        import json as _j
+        save(s.get("as", "cookies"), _j.dumps(cs))
+    elif act == "setcookie":
+        page.context.add_cookies([{"name": g("name"), "value": g("value"),
+                                   "url": g("domain") or page.url}])
+    elif act == "image_click":
+        hit = _image_click(page, s["template"], float(s.get("threshold", 0.85)), wd)
+        if not hit and s.get("required", True):
+            raise RuntimeError(f"image_click: không thấy {s['template']}")
+        save(s.get("as", f"img_{i}"), hit)
+    # ---- Data / biến
+    elif act == "set_var": save(g("var"), g("value"))
+    elif act == "inc_var":
+        save(g("var"), float(v.get(g("var"), 0) or 0) + float(g("by", "1") or 1))
+    elif act == "math":
+        import ast
+        import operator as op
+        save(s.get("as", "result"), _safe_math(g("expr"), ast, op))
+    elif act == "http_request":
+        save(s.get("as", "resp"), _http(g("method", "GET"), g("url"), g("body"),
+                                        s.get("headers", ""), v, int(s.get("timeout", 30))))
+    elif act == "parse_json":
+        import json as _j
+        save(s.get("as", "value"), _json_path(_j.loads(g("input") or "{}"), g("path")))
+    elif act == "regex":
+        m = re.search(g("pattern"), g("input"))
+        save(s.get("as", "match"), (m.group(1) if m and m.groups() else (m.group(0) if m else "")))
+    elif act == "random_data": save(s.get("as", "value"), _random_data(g("kind"), g("arg")))
+    elif act == "random_number":
+        import random
+        save(s.get("as", "num"), random.randint(int(g("min", "0") or 0), int(g("max", "100") or 100)))
+    elif act == "random_line":
+        import random
+        p = Path(g("path")); p = p if p.is_absolute() else wd / p
+        lines = [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        save(s.get("as", "line"), random.choice(lines) if lines else "")
+    elif act == "read_file":
+        p = Path(g("path")); p = p if p.is_absolute() else wd / p
+        save(s.get("as", "content"), p.read_text(encoding="utf-8"))
+    elif act == "write_file":
+        p = Path(g("path")); p = p if p.is_absolute() else wd / p
+        mode = "a" if str(s.get("append", "")).lower() == "true" else "w"
+        with open(p, mode, encoding="utf-8") as f:
+            f.write(g("content"))
+    elif act == "split_text":
+        parts = g("input").split(g("sep"))
+        idx = int(s.get("index", 0))
+        save(s.get("as", "part"), parts[idx] if -len(parts) <= idx < len(parts) else "")
+    # ---- Account
+    elif act == "gen_2fa": save(s.get("as", "otp"), _totp(g("secret")))
+    elif act == "telegram":
+        _http("POST", f"https://api.telegram.org/bot{g('token')}/sendMessage", "",
+              "", v, 15, json_body={"chat_id": g("chatid"), "text": g("message")})
+    elif act == "solve_captcha":
+        tok = _solve_captcha_2captcha(g("apikey"), g("type", "recaptcha_v2"),
+                                      g("sitekey"), page.url, g("action"))
+        save(s.get("as", "captcha"), tok)
+        if str(s.get("inject", "true")).lower() == "true" and tok:
+            page.evaluate(_CAPTCHA_INJECT_JS, tok)
+    else:
+        raise RuntimeError(f"action chưa cài: {act}")
+
+
+def _safe_math(expr: str, ast: Any, op: Any) -> float:
+    """Tính biểu thức số học an toàn (chỉ + - * / % ** và số), không eval()."""
+    ops = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Div: op.truediv,
+           ast.Mod: op.mod, ast.Pow: op.pow, ast.USub: op.neg, ast.UAdd: op.pos}
+    def ev(n: Any) -> float:
+        if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
+            return float(n.value)
+        if isinstance(n, ast.BinOp):
+            return ops[type(n.op)](ev(n.left), ev(n.right))
+        if isinstance(n, ast.UnaryOp):
+            return ops[type(n.op)](ev(n.operand))
+        raise ValueError("biểu thức không hợp lệ")
+    return ev(ast.parse(expr, mode="eval").body)
+
+
+def _http(method: str, url: str, body: str, headers_raw: str, vars: dict,
+          timeout: int, json_body: dict | None = None) -> str:
+    """HTTP request thuần stdlib (urllib). headers_raw: 'Key: Value' mỗi dòng ({{var}} được)."""
+    import json as _j
+    import urllib.request
+    hdrs: dict[str, str] = {}
+    for ln in (headers_raw or "").splitlines():
+        if ":" in ln:
+            k, val = ln.split(":", 1)
+            hdrs[k.strip()] = _subst(val.strip(), vars)
+    data = None
+    if json_body is not None:
+        data = _j.dumps(json_body).encode(); hdrs.setdefault("Content-Type", "application/json")
+    elif body:
+        data = body.encode()
+    req = urllib.request.Request(url, data=data, headers=hdrs, method=method.upper())
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 (URL do user nhập)
+        return r.read().decode("utf-8", "replace")
+
+
+_CAPTCHA_INJECT_JS = """tok => {
+  const set = (sel) => { const e = document.querySelector(sel); if (e) { e.value = tok;
+    e.dispatchEvent(new Event('input', {bubbles:true})); } };
+  set('#g-recaptcha-response'); set('[name="g-recaptcha-response"]');
+  set('[name="h-captcha-response"]'); set('#h-captcha-response');
+}"""
+
+
+def _solve_captcha_2captcha(apikey: str, ctype: str, sitekey: str, pageurl: str, action: str) -> str:
+    """Giải captcha qua API kiểu 2captcha (in.php/res.php). recaptcha_v2/v3/hcaptcha. Trả token."""
+    import time
+    import urllib.parse
+    import urllib.request
+    method = {"recaptcha_v2": "userrecaptcha", "recaptcha_v3": "userrecaptcha",
+              "hcaptcha": "hcaptcha"}.get(ctype, "userrecaptcha")
+    q = {"key": apikey, "method": method, "googlekey": sitekey, "sitekey": sitekey,
+         "pageurl": pageurl, "json": "1"}
+    if ctype == "recaptcha_v3":
+        q["version"] = "v3"; q["action"] = action or "verify"
+    in_url = "https://2captcha.com/in.php?" + urllib.parse.urlencode(q)
+    with urllib.request.urlopen(in_url, timeout=30) as r:  # noqa: S310
+        import json as _j
+        rid = _j.loads(r.read())["request"]
+    for _ in range(40):                                  # chờ tối đa ~2 phút
+        time.sleep(5)
+        res_url = f"https://2captcha.com/res.php?key={apikey}&action=get&id={rid}&json=1"
+        with urllib.request.urlopen(res_url, timeout=30) as r:  # noqa: S310
+            import json as _j
+            d = _j.loads(r.read())
+        if d.get("status") == 1:
+            return d["request"]
+        if d.get("request") != "CAPCHA_NOT_READY":
+            raise RuntimeError(f"captcha lỗi: {d.get('request')}")
+    raise RuntimeError("captcha quá thời gian chờ")
+
+
 def run_script(ws_endpoint: str, steps: list[dict], *, engine: str = "chromium",
                workdir: str | Path = ".", default_timeout: int = 20000) -> dict:
     """Nối browser (camoufox=Playwright Firefox, còn lại=CDP Chromium), chạy step. Trả {ok, log[], data{}}."""
@@ -90,39 +505,19 @@ def run_script(ws_endpoint: str, steps: list[dict], *, engine: str = "chromium",
     if errs:
         return {"ok": False, "log": errs, "data": {}}
     workdir = Path(workdir)
-    log: list[str] = []
-    data: dict[str, Any] = {}
     with sync_playwright() as pw:
         browser = _connect(pw, engine, ws_endpoint)
-        ctx = browser.contexts[0] if browser.contexts else browser.new_context()
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        bctx = browser.contexts[0] if browser.contexts else browser.new_context()
+        page = bctx.pages[0] if bctx.pages else bctx.new_page()
         page.set_default_timeout(default_timeout)
+        ctx = _Ctx(browser, page, workdir, default_timeout)
         try:
-            for i, s in enumerate(steps):
-                act = s["action"]
-                if act == "goto": page.goto(s["url"], wait_until=s.get("wait_until", "load"))
-                elif act == "click": page.click(s["selector"])
-                elif act == "type": page.type(s["selector"], s["text"])   # gõ từng phím (bắn keydown/up)
-                elif act == "fill": page.fill(s["selector"], s["text"])     # set value thẳng (nhanh)
-                elif act == "wait": page.wait_for_timeout(int(s["ms"]))
-                elif act == "waitfor": page.wait_for_selector(s["selector"])
-                elif act == "press": page.keyboard.press(s["key"])
-                elif act == "scroll": page.mouse.wheel(int(s.get("x", 0)), int(s.get("y", 600)))
-                elif act == "screenshot": page.screenshot(path=str(workdir / s.get("path", f"shot_{i}.png")))
-                elif act == "eval": data[s.get("as", f"eval_{i}")] = page.evaluate(s["js"])
-                elif act == "extract":
-                    el = page.query_selector(s["selector"])
-                    val = (el.get_attribute(s["attr"]) if s.get("attr") else el.inner_text()) if el else None
-                    data[s.get("as", f"extract_{i}")] = val
-                elif act == "image_click":
-                    hit = _image_click(page, s["template"], float(s.get("threshold", 0.85)), workdir)
-                    if not hit and s.get("required", True):
-                        raise RuntimeError(f"image_click: không thấy {s['template']}")
-                    data[s.get("as", f"img_{i}")] = hit
-                log.append(f"step {i} ok: {act}")
+            _run_steps(steps, ctx)
+        except _Stop:
+            pass
         except Exception as e:  # noqa: BLE001
-            log.append(f"step lỗi: {e}")
+            ctx.log.append(f"step lỗi: {e}")
             browser.close()
-            return {"ok": False, "log": log, "data": data}
+            return {"ok": False, "log": ctx.log, "data": ctx.data, "vars": ctx.vars}
         browser.close()
-    return {"ok": True, "log": log, "data": data}
+    return {"ok": True, "log": ctx.log, "data": ctx.data, "vars": ctx.vars}

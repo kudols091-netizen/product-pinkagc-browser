@@ -584,28 +584,82 @@ async function loadTrash(){try{const l=await j(`${API}/profiles/trash`);document
 
 /* ----- Automation ----- */
 /* Trình dựng no-code: mỗi action + field tương ứng */
+/* key field KHỚP backend core/automation.py. cat = nhóm (optgroup). Mọi field text nhận {{bien}}. */
 const AU_ACTIONS={
-  goto:{label:"Mở URL",f:[["url","URL","https://ip8.com"]]},
-  click:{label:"Click",f:[["selector","Selector","#btn"]]},
-  type:{label:"Gõ chữ",f:[["selector","Selector","#email"],["text","Nội dung","abc"]]},
-  fill:{label:"Điền ô",f:[["selector","Selector","#email"],["text","Giá trị",""]]},
-  wait:{label:"Chờ (ms)",f:[["ms","Mili-giây","2000"]]},
-  waitfor:{label:"Chờ phần tử",f:[["selector","Selector","#el"]]},
-  press:{label:"Nhấn phím",f:[["key","Phím (Enter/Tab...)","Enter"]]},
-  scroll:{label:"Cuộn",f:[["y","Px (trống = cuối trang)",""]]},
-  screenshot:{label:"Chụp màn",f:[["path","Tên file","shot.png"]]},
-  eval:{label:"Chạy JS",f:[["expression","Biểu thức JS","document.title"]]},
-  extract:{label:"Trích text",f:[["selector","Selector","body"],["as","Lưu vào biến","out"]]},
-  image_click:{label:"Click theo ảnh",f:[["path","Ảnh mẫu (OpenCV)","btn.png"]]},
+  // ---- Trình duyệt ----
+  goto:{cat:"Trình duyệt",label:"Mở URL",f:[["url","URL","https://ip8.com"]]},
+  newtab:{cat:"Trình duyệt",label:"Tab mới",f:[["url","URL","https://..."]]},
+  switchtab:{cat:"Trình duyệt",label:"Chuyển tab",f:[["index","Chỉ số tab (0=đầu)","0"]]},
+  closetab:{cat:"Trình duyệt",label:"Đóng tab",f:[]},
+  reload:{cat:"Trình duyệt",label:"Tải lại",f:[]},
+  goback:{cat:"Trình duyệt",label:"Quay lại",f:[]},
+  click:{cat:"Trình duyệt",label:"Click",f:[["selector","Selector / XPath","#btn"],["retry","Retry (0=tắt)",""]]},
+  dblclick:{cat:"Trình duyệt",label:"Double click",f:[["selector","Selector","#btn"]]},
+  rightclick:{cat:"Trình duyệt",label:"Chuột phải",f:[["selector","Selector","#btn"]]},
+  hover:{cat:"Trình duyệt",label:"Rê chuột",f:[["selector","Selector",".menu"]]},
+  type:{cat:"Trình duyệt",label:"Gõ chữ",f:[["selector","Selector","#email"],["text","Nội dung","{{acc}}"]]},
+  human_type:{cat:"Trình duyệt",label:"Gõ như người",f:[["selector","Selector","#email"],["text","Nội dung",""],["delay","Trễ mỗi phím (ms)","90"]]},
+  fill:{cat:"Trình duyệt",label:"Điền ô (nhanh)",f:[["selector","Selector","#email"],["text","Giá trị",""]]},
+  clear:{cat:"Trình duyệt",label:"Xoá ô",f:[["selector","Selector","#email"]]},
+  select:{cat:"Trình duyệt",label:"Chọn dropdown",f:[["selector","Selector","select#m"],["value","Value (trống=random)",""]]},
+  check:{cat:"Trình duyệt",label:"Tick/bỏ tick",f:[["selector","Selector","#agree"],["state","check/uncheck","check"]]},
+  press:{cat:"Trình duyệt",label:"Nhấn phím",f:[["key","Phím (Enter/Tab...)","Enter"]]},
+  uploadfile:{cat:"Trình duyệt",label:"Upload file",f:[["selector","Ô file","input[type=file]"],["path","Đường dẫn","C:\\a.png"]]},
+  scroll:{cat:"Trình duyệt",label:"Cuộn",f:[["y","Px (trống=cuối)",""]]},
+  scrollto:{cat:"Trình duyệt",label:"Cuộn tới phần tử",f:[["selector","Selector","#footer"]]},
+  wait:{cat:"Trình duyệt",label:"Chờ (ms)",f:[["ms","Mili-giây","2000"]]},
+  waitfor:{cat:"Trình duyệt",label:"Chờ phần tử",f:[["selector","Selector","#el"]]},
+  waittext:{cat:"Trình duyệt",label:"Chờ text",f:[["text","Text xuất hiện","Xong"]]},
+  waiturl:{cat:"Trình duyệt",label:"Chờ URL chứa",f:[["contains","URL chứa","/home"]]},
+  screenshot:{cat:"Trình duyệt",label:"Chụp màn",f:[["path","Tên file","shot.png"],["full","Full? true/false","false"]]},
+  eval:{cat:"Trình duyệt",label:"Chạy JS",f:[["js","Biểu thức JS","document.title"],["as","Lưu vào biến",""]]},
+  extract:{cat:"Trình duyệt",label:"Trích text",f:[["selector","Selector","body"],["as","Lưu vào biến","out"]]},
+  getattr:{cat:"Trình duyệt",label:"Lấy attribute",f:[["selector","Selector","a"],["attr","Thuộc tính","href"],["as","Lưu vào","link"]]},
+  geturl:{cat:"Trình duyệt",label:"Lấy URL",f:[["as","Lưu vào biến","url"]]},
+  gettitle:{cat:"Trình duyệt",label:"Lấy tiêu đề",f:[["as","Lưu vào biến","title"]]},
+  exists:{cat:"Trình duyệt",label:"Phần tử tồn tại?",f:[["selector","Selector",".x"],["as","Lưu true/false","exists"]]},
+  count:{cat:"Trình duyệt",label:"Đếm phần tử",f:[["selector","Selector",".item"],["as","Lưu số lượng","count"]]},
+  getcookies:{cat:"Trình duyệt",label:"Lấy cookie",f:[["as","Lưu JSON vào","cookies"],["name","Chỉ cookie tên (tuỳ chọn)",""]]},
+  setcookie:{cat:"Trình duyệt",label:"Đặt cookie",f:[["name","Tên",""],["value","Giá trị",""],["domain","Domain (trống=hiện tại)",""]]},
+  image_click:{cat:"Trình duyệt",label:"Click theo ảnh",f:[["template","Ảnh mẫu (OpenCV)","btn.png"],["threshold","Ngưỡng","0.85"]]},
+  // ---- Dữ liệu / Biến ----
+  set_var:{cat:"Dữ liệu",label:"Đặt biến",f:[["var","Tên biến","x"],["value","Giá trị","{{other}}"]]},
+  inc_var:{cat:"Dữ liệu",label:"Tăng/giảm biến",f:[["var","Tên biến","i"],["by","Cộng thêm (âm=trừ)","1"]]},
+  math:{cat:"Dữ liệu",label:"Tính toán",f:[["expr","Biểu thức ({{a}}*2)",""],["as","Lưu vào","result"]]},
+  http_request:{cat:"Dữ liệu",label:"HTTP Request",f:[["method","GET/POST","GET"],["url","URL","https://api.ipify.org"],["body","Body",""],["headers","Headers (Key: Value /dòng)",""],["as","Lưu response","resp"]]},
+  parse_json:{cat:"Dữ liệu",label:"Parse JSON",f:[["input","JSON ({{resp}})","{{resp}}"],["path","Path (data.0.name)","ip"],["as","Lưu vào","value"]]},
+  regex:{cat:"Dữ liệu",label:"Trích Regex",f:[["input","Chuỗi vào","{{resp}}"],["pattern","Regex","\"ip\":\"([^\"]+)\""],["as","Lưu vào","ip"]]},
+  random_data:{cat:"Dữ liệu",label:"Dữ liệu ngẫu nhiên",f:[["kind","name/email/username/password/uuid/phone","email"],["arg","Tham số (độ dài/domain)",""],["as","Lưu vào","value"]]},
+  random_number:{cat:"Dữ liệu",label:"Số ngẫu nhiên",f:[["min","Nhỏ nhất","0"],["max","Lớn nhất","100"],["as","Lưu vào","num"]]},
+  random_line:{cat:"Dữ liệu",label:"Dòng ngẫu nhiên",f:[["path","File (mỗi dòng 1 mục)","data.txt"],["as","Lưu vào","line"]]},
+  read_file:{cat:"Dữ liệu",label:"Đọc file",f:[["path","Đường dẫn","a.txt"],["as","Lưu vào","content"]]},
+  write_file:{cat:"Dữ liệu",label:"Ghi file",f:[["path","Đường dẫn","out.txt"],["content","Nội dung",""],["append","Nối thêm? true/false","true"]]},
+  split_text:{cat:"Dữ liệu",label:"Tách chuỗi",f:[["input","Chuỗi","{{line}}"],["sep","Ký tự tách","|"],["index","Lấy phần (0-based)","0"],["as","Lưu vào","part"]]},
+  // ---- Tài khoản ----
+  gen_2fa:{cat:"Tài khoản",label:"Sinh mã 2FA (TOTP)",f:[["secret","Secret Base32","JBSWY3DPEHPK3PXP"],["as","Lưu mã vào","otp"]]},
+  telegram:{cat:"Tài khoản",label:"Báo Telegram",f:[["token","Bot token",""],["chatid","Chat ID",""],["message","Tin nhắn","{{var}}"]]},
+  solve_captcha:{cat:"Tài khoản",label:"Giải Captcha",f:[["apikey","API key (2captcha)",""],["type","recaptcha_v2/v3/hcaptcha","recaptcha_v2"],["sitekey","Site key (trống=auto)",""],["as","Lưu token","captcha"]]},
+  // ---- Logic (nhánh đơn; loop/foreach/if có thân -> dùng chế độ JSON) ----
+  log:{cat:"Logic",label:"Ghi log",f:[["message","Thông điệp","{{x}}"]]},
+  comment:{cat:"Logic",label:"Ghi chú",f:[["text","Ghi chú (không chạy)",""]]},
+  stop:{cat:"Logic",label:"Dừng kịch bản",f:[]},
+  throw:{cat:"Logic",label:"Báo lỗi (Throw)",f:[["message","Thông báo lỗi",""]]},
 };
 function auInitSteps(){if(STATE.autoSteps===undefined){try{STATE.autoSteps=JSON.parse(STATE.autoScript||"");}catch(e){STATE.autoSteps=[{action:"goto",url:"https://ip8.com"},{action:"wait",ms:2000},{action:"screenshot",path:"shot.png"}];}}}
 function auStepsClean(){return (STATE.autoSteps||[]).map(s=>{const o={action:s.action};for(const k in s){if(k==="action")continue;let v=s[k];if((k==="ms"||k==="y")&&v!=="")v=Number(v);if(v!==""&&v!=null)o[k]=v;}return o;});}
 function auGetSteps(){return (STATE.autoMode||"build")==="json"?JSON.parse(val("auJson")):auStepsClean();}
+/* Option select nhóm theo cat (optgroup). Giữ cả action control-flow (loop/if...) nếu step đang là nó. */
+function auActionOptions(sel){const cats={};Object.entries(AU_ACTIONS).forEach(([k,v])=>{(cats[v.cat]=cats[v.cat]||[]).push([k,v.label]);});
+  let html=Object.entries(cats).map(([c,arr])=>`<optgroup label="${esc(c)}">${arr.map(([k,l])=>`<option value="${k}" ${sel===k?'selected':''}>${esc(l)}</option>`).join("")}</optgroup>`).join("");
+  if(!AU_ACTIONS[sel])html=`<optgroup label="Điều khiển (JSON)"><option value="${esc(sel)}" selected>${esc(sel)}</option></optgroup>`+html;
+  return html;}
 function auBuilder(){const steps=STATE.autoSteps||[];
-  return steps.length?steps.map((s,i)=>{const def=AU_ACTIONS[s.action]||AU_ACTIONS.goto;
+  return steps.length?steps.map((s,i)=>{const def=AU_ACTIONS[s.action];
+    const fields=def?def.f.map(([key,lbl,ph])=>`<input placeholder="${esc(lbl)}" title="${esc(lbl)}" value="${esc(s[key]==null?'':s[key])}" oninput="auSetField(${i},'${key}',this.value)">`).join("")
+      :`<span class="dim" style="font-size:12px;align-self:center">⛓ bước điều khiển — sửa ở chế độ <b>JSON</b></span>`;
     return `<div class="austep"><span class="auno">${i+1}</span>
-      <select onchange="auSetAction(${i},this.value)">${Object.entries(AU_ACTIONS).map(([k,v])=>`<option value="${k}" ${s.action===k?'selected':''}>${v.label}</option>`).join("")}</select>
-      ${def.f.map(([key,lbl])=>`<input placeholder="${esc(lbl)}" value="${esc(s[key]==null?'':s[key])}" oninput="auSetField(${i},'${key}',this.value)">`).join("")}
+      <select onchange="auSetAction(${i},this.value)">${auActionOptions(s.action)}</select>
+      ${fields}
       <span class="gp"><button class="btn sm" onclick="auMove(${i},-1)" title="Lên">↑</button><button class="btn sm" onclick="auMove(${i},1)" title="Xuống">↓</button><button class="btn sm" onclick="auDel(${i})" title="Xoá">🗑</button></span>
     </div>`;}).join(""):'<p class="dim" style="padding:8px 0">Chưa có bước nào — bấm <b>Thêm bước</b> để dựng kịch bản.</p>';}
 function auRerender(){const el=document.getElementById("auSteps");if(el)el.innerHTML=auBuilder();}
@@ -632,9 +686,9 @@ function viewAutomation(){const opts=STATE.profiles.map(p=>`<option value="${p.i
       <button class="btn" onclick="auRunAll()" title="Đồng bộ: chạy kịch bản này trên MỌI profile đang chạy cùng lúc">${svg(I.copy)}Chạy đồng bộ (${STATE.profiles.filter(p=>p.status==='running').length} đang mở)</button>
       <button class="btn ghost-pink" id="auStopBtn" onclick="auStop()" style="display:none">${svg(I.stop)}Dừng</button></div>
    </div>
-   <div><div class="summary"><b>12 action hỗ trợ</b>
-     <div style="margin-top:10px;line-height:1.9;font-size:13px" class="dim">${Object.values(AU_ACTIONS).map(a=>esc(a.label)).join(" · ")}</div></div>
-     <div class="hint">Mở headless, chạy xong tự đóng (nếu profile chưa mở). <code>Gõ chữ</code> gõ thật, <code>Click theo ảnh</code> dùng OpenCV. "Trình dựng" và "JSON" đồng bộ hai chiều.</div></div>
+   <div><div class="summary"><b>${Object.keys(AU_ACTIONS).length}+ action hỗ trợ</b>
+     <div style="margin-top:10px;line-height:1.8;font-size:12.5px" class="dim">${[...new Set(Object.values(AU_ACTIONS).map(a=>a.cat))].map(c=>`<b style="color:var(--text)">${esc(c)}:</b> `+Object.values(AU_ACTIONS).filter(a=>a.cat===c).map(a=>esc(a.label)).join(" · ")).join("<br>")}</div></div>
+     <div class="hint">Mọi ô text nhận biến <code>{{ten}}</code> (từ Trích text / HTTP / Set biến…). Vòng lặp & điều kiện (<code>loop</code> / <code>foreach</code> / <code>if</code> / <code>while_exists</code> có <b>thân</b>) dựng ở chế độ <b>JSON</b>. Mỗi bước có thể thêm <code>retry</code>/<code>timeout</code>. Mở headless, chạy xong tự đóng (nếu profile chưa mở).</div></div>
   </div>
   <div class="card" style="padding:16px 20px;margin-top:16px">
     <div class="inline" style="justify-content:space-between"><b>Kết quả</b><span id="auStatus" class="dim" style="font-size:13px">Chưa chạy</span></div>
