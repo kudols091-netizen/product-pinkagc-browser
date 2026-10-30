@@ -1294,9 +1294,9 @@ function renderCreate(){
    <div class="mhead"><div class="ic">${svg(I.plus)}</div><h2>Tạo profile</h2><button class="x" onclick="show(false)">✕</button></div>
    <div class="mbody">
     <div class="createtop" style="grid-template-columns:1fr 1fr auto">
-      <div><input id="cName" placeholder="Tên profile" value="Profile ${Math.floor(1000+Math.random()*9000)}"><div id="cNameErr" class="ferr">Nhập tên profile</div></div>
-      <select id="cGroup"><option value="">Default group</option>${STATE.groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join("")}</select>
-      <button class="btn" onclick="randPreview()">${svg(I.shuffle)}Thông số ngẫu nhiên</button>
+      <div><label for="cName">Tên profile</label><input id="cName" placeholder="VD: Profile 8059" value="Profile ${Math.floor(1000+Math.random()*9000)}"><div id="cNameErr" class="ferr">Nhập tên profile</div></div>
+      <div><label for="cGroup">Nhóm</label><select id="cGroup"><option value="">Default group</option>${STATE.groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join("")}</select></div>
+      <button class="btn" style="align-self:end" onclick="randPreview()">${svg(I.shuffle)}Thông số ngẫu nhiên</button>
     </div>
     <div class="tabs">${tabs.map(t=>`<button data-tt="${t[0]}" class="${CT.tab===t[0]?'on':''}" onclick="switchTab('${t[0]}')">${t[1]}</button>`).join("")}</div>
     <div class="split">
@@ -1512,7 +1512,37 @@ async function apCheck(){const raw=val("apRaw");if(!raw)return toast("Nhập raw
 async function apSave(id){const prov=val("apProv");const payload=prov?{provider:prov,api_key:val("apKey")}:{raw_proxy:val("apRaw")};try{const d=await j(`${API}/profiles/${id}/proxy`,body(payload));show(false);toast("Proxy: "+(d.raw_proxy||'(trống)'),"ok");refresh();}catch(e){toast(e.message,"err");}}
 
 /* ================= BOOT ================= */
-(async function(){renderNav();await load();render();loadHealth();setInterval(()=>{
+/* ---------- a11y: tự nối label + id cho field (động, phủ cả modal) ---------- */
+const _lblSeen=new WeakSet();
+function linkLabels(){
+  document.querySelectorAll('#content input,#content select,#content textarea,#overlay input,#overlay select,#overlay textarea').forEach(el=>{
+    if(el.type==='hidden'||_lblSeen.has(el))return;
+    _lblSeen.add(el);
+    if(!el.id&&!el.name)el.id='f_'+Math.random().toString(36).slice(2,9);
+    // đã nằm trong <label> bọc ngoài: chỉ thiếu accessible name -> lấy từ span cạnh bên
+    const wrap=el.closest('label');
+    if(wrap){
+      if(!el.getAttribute('aria-label')){
+        const host=el.closest('.segrow,.checkline,.inline');
+        const t=host?host.textContent.replace(/\s+/g,' ').trim():'';
+        if(t)el.setAttribute('aria-label',t);
+      }
+      return;
+    }
+    if(el.getAttribute('aria-label'))return;
+    // bước automation: select = hành động, input = tham số (lấy từ placeholder)
+    if(el.closest('.austep')){el.setAttribute('aria-label',el.tagName==='SELECT'?'Hành động của bước':(el.placeholder||'Tham số'));return;}
+    const field=el.closest('.field,.segrow,.checkline,.createtop');
+    let lab=field?field.querySelector(':scope > label, label'):null;
+    if(!lab){const p=el.previousElementSibling;if(p&&p.tagName==='LABEL')lab=p;}
+    if(lab&&!lab.htmlFor){lab.htmlFor=el.id;}
+    else if(!lab){const t=(el.placeholder||el.title||'').trim();if(t)el.setAttribute('aria-label',t);}
+  });
+}
+(function(){const o=new MutationObserver(()=>{clearTimeout(window._lblT);window._lblT=setTimeout(linkLabels,80);});
+  ['content','overlay'].forEach(id=>{const n=document.getElementById(id);if(n)o.observe(n,{childList:true,subtree:true});});})();
+
+(async function(){renderNav();await load();render();loadHealth();linkLabels();setInterval(()=>{
   if(STATE.view!=='home'&&STATE.view!=='profiles')return;
   if(document.getElementById('overlay').classList.contains('show'))return;
   const cm=document.getElementById('colMenu');if(cm&&cm.style.display==='block')return;  // đừng đóng menu cột đang mở
