@@ -256,6 +256,15 @@
   .inline{display:flex;align-items:center;gap:12px}
   .mfoot{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--line);background:#fffafd}
   .checkline{display:flex;align-items:center;gap:9px;font-weight:600;color:#5a5260;margin-bottom:14px}
+  /* ô kết quả check proxy live */
+  .prxres{margin:2px 0 4px;padding:10px 12px;border-radius:10px;font-size:13.5px;line-height:1.5;display:none}
+  .prxres.show{display:block}
+  .prxres.ok{background:var(--okbg);border:1px solid #cdeedb;color:#2f7d4f}
+  .prxres.err{background:var(--errbg);border:1px solid #f3c9cb;color:var(--err)}
+  .prxres.load{background:#fbf6fa;border:1px solid var(--line);color:var(--mut)}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line2);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:4px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  [data-theme="dark"] .prxres.load{background:#241d30}
   /* thẻ Nâng cao + công tắc tổng (Master Power) */
   .advbox{border:1px solid var(--line2);border-radius:12px;padding:14px 16px;margin-top:16px;background:#fffafd}
   .advbox .advhead{display:flex;align-items:center;gap:10px}
@@ -1584,11 +1593,23 @@ function openProxy(id){const p=STATE.profiles.find(x=>x.id===id)||{};
     <div class="field"><label>Proxy (dán trần — tự nhận http/socks5)</label><input id="apRaw" placeholder="host:port:user:pass"></div>
     <div class="field"><label>Hoặc provider</label><select id="apProv"><option value="">— nhập raw —</option>${STATE.providers.map(p=>`<option>${esc(p)}</option>`).join("")}</select></div>
     <div class="field"><label>API key (nếu dùng provider)</label><input id="apKey" placeholder="api_key"></div>
-    <div id="apSt" class="dim"></div>
+    <div id="apSt" class="prxres"></div>
    </div>
-   <div class="mfoot"><button class="btn ghost-pink" onclick="apCheck()">Kiểm tra</button><button class="btn" onclick="show(false)">Huỷ</button><button class="btn pri" onclick="apSave('${id}')">Gán</button></div></div>`;
+   <div class="mfoot"><button class="btn ghost-pink" id="apChkBtn" onclick="apCheck()">${svg(I.play)}Kiểm tra live</button><button class="btn" onclick="show(false)">Huỷ</button><button class="btn pri" onclick="apSave('${id}')">Gán</button></div></div>`;
   show(true);}
-async function apCheck(){const raw=val("apRaw");if(!raw)return toast("Nhập raw proxy để kiểm tra","");document.getElementById("apSt").textContent="Đang kiểm tra...";try{const d=await j(`${API}/proxy/check`,body({raw_proxy:raw}));document.getElementById("apSt").innerHTML=d.alive?`<span style="color:var(--ok)">● Sống</span> ${esc(d.exit_ip||'')} ${esc(d.country||'')} · ${d.latency_ms}ms · ${esc(d.scheme||'')}`:`<span style="color:var(--err)">● Chết</span> ${esc(d.error||'')}`;}catch(e){document.getElementById("apSt").textContent=e.message;}}
+async function apCheck(){
+  const raw=(val("apRaw")||"").trim(), st=document.getElementById("apSt"), btn=document.getElementById("apChkBtn");
+  if(!raw){st.className="prxres show err";st.textContent="Nhập proxy (dán trần) để kiểm tra live";return;}
+  if(btn)btn.disabled=true;
+  st.className="prxres show load";st.innerHTML=`<span class="spin"></span> Đang kiểm tra proxy live — kết nối thật qua proxy…`;
+  try{
+    const d=await j(`${API}/proxy/check`,body({raw_proxy:raw}));
+    if(d.alive){st.className="prxres show ok";
+      st.innerHTML=`● <b>Sống</b> · IP thoát <b>${esc(d.exit_ip||'?')}</b>${d.country?` · ${esc(d.country)}`:''}${d.latency_ms!=null?` · ${d.latency_ms}ms`:''}${d.scheme?` · ${esc(d.scheme)}`:''}`;}
+    else{st.className="prxres show err";st.innerHTML=`● <b>Chết</b> · ${esc(d.error||'không kết nối được qua proxy')}`;}
+  }catch(e){st.className="prxres show err";st.textContent=e.message;}
+  finally{if(btn)btn.disabled=false;}
+}
 async function apSave(id){const prov=val("apProv");const payload=prov?{provider:prov,api_key:val("apKey")}:{raw_proxy:val("apRaw")};try{const d=await j(`${API}/profiles/${id}/proxy`,body(payload));show(false);toast("Proxy: "+(d.raw_proxy||'(trống)'),"ok");refresh();}catch(e){toast(e.message,"err");}}
 
 /* ================= BOOT ================= */
