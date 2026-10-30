@@ -49,6 +49,23 @@ CREATE TABLE IF NOT EXISTS proxy_tags (
   FOREIGN KEY (proxy_id) REFERENCES proxies(id) ON DELETE CASCADE,
   FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS scripts (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, steps TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS runs (
+  id TEXT PRIMARY KEY, profile_id TEXT, profile_name TEXT, script_name TEXT,
+  ok INTEGER, source TEXT NOT NULL DEFAULT 'manual',
+  started_at TEXT NOT NULL, finished_at TEXT, log TEXT, data TEXT
+);
+CREATE TABLE IF NOT EXISTS schedules (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, script_id TEXT,
+  profile_ids TEXT NOT NULL DEFAULT '[]', kind TEXT NOT NULL DEFAULT 'interval',
+  interval_min INTEGER NOT NULL DEFAULT 60, at_time TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1, last_run TEXT, next_run TEXT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_runs_started   ON runs(started_at);
 CREATE INDEX IF NOT EXISTS idx_profiles_group_id   ON profiles(group_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_is_deleted ON profiles(is_deleted);
 CREATE INDEX IF NOT EXISTS idx_profile_tags_pid    ON profile_tags(profile_id);
@@ -295,6 +312,126 @@ class Database:
     def delete_group(self, gid: str) -> None:
         """Xoá nhóm; profile trong nhóm về group_id=NULL (FK ON DELETE SET NULL)."""
         self.conn.execute("DELETE FROM groups WHERE id=?", (gid,))
+        self.conn.commit()
+
+    # --- scripts (kịch bản automation lưu sẵn) ---
+    def create_script(self, name: str, steps: list) -> str:
+        sid, now = _uuid(), _now()
+        self.conn.execute(
+            "INSERT INTO scripts (id,name,steps,created_at,updated_at) VALUES (?,?,?,?,?)",
+            (sid, name, json.dumps(steps, ensure_ascii=False), now, now))
+        self.conn.commit()
+        return sid
+
+    def list_scripts(self) -> list[dict]:
+        rows = self.conn.execute("SELECT * FROM scripts ORDER BY updated_at DESC").fetchall()
+        return [{"id": r["id"], "name": r["name"], "steps": json.loads(r["steps"] or "[]"),
+                 "updated_at": r["updated_at"]} for r in rows]
+
+    def get_script(self, sid: str) -> Optional[dict]:
+        r = self.conn.execute("SELECT * FROM scripts WHERE id=?", (sid,)).fetchone()
+        return {"id": r["id"], "name": r["name"], "steps": json.loads(r["steps"] or "[]"),
+                "updated_at": r["updated_at"]} if r else None
+
+    def update_script(self, sid: str, *, name: str | None = None, steps: list | None = None) -> None:
+        sets, vals = [], []
+        if name is not None:
+            sets.append("name=?"); vals.append(name)
+        if steps is not None:
+            sets.append("steps=?"); vals.append(json.dumps(steps, ensure_ascii=False))
+        if not sets:
+            return
+        sets.append("updated_at=?"); vals.append(_now()); vals.append(sid)
+        self.conn.execute(f"UPDATE scripts SET {','.join(sets)} WHERE id=?", vals)
+        self.conn.commit()
+
+    def delete_script(self, sid: str) -> None:
+        self.conn.execute("DELETE FROM scripts WHERE id=?", (sid,))
+        self.conn.commit()
+
+    # --- runs (nhật ký chạy automation) ---
+    def add_run(self, profile_id: str, profile_name: str, script_name: str,
+                source: str = "manual") -> str:
+        rid = _uuid()
+        self.conn.execute(
+            "INSERT INTO runs (id,profile_id,profile_name,script_name,source,started_at) "
+            "VALUES (?,?,?,?,?,?)", (rid, profile_id, profile_name, script_name, source, _now()))
+        self.conn.commit()
+        return rid
+
+    def finish_run(self, rid: str, ok: bool, log: list | None = None, data: dict | None = None) -> None:
+        self.conn.execute(
+            "UPDATE runs SET ok=?, finished_at=?, log=?, data=? WHERE id=?",
+            (1 if ok else 0, _now(), json.dumps(log or [], ensure_ascii=False),
+             json.dumps(data or {}, ensure_ascii=False), rid))
+        self.conn.commit()
+
+    def list_runs(self, limit: int = 100, profile_id: str | None = None) -> list[dict]:
+        if profile_id:
+            rows = self.conn.execute(
+                "SELECT * FROM runs WHERE profile_id=? ORDER BY started_at DESC LIMIT ?",
+                (profile_id, limit)).fetchall()
+        else:
+            rows = self.conn.execute(
+                "SELECT * FROM runs ORDER BY started_at DESC LIMIT ?", (limit,)).fetchall()
+        return [{"id": r["id"], "profile_id": r["profile_id"], "profile_name": r["profile_name"],
+                 "script_name": r["script_name"], "source": r["source"],
+                 "ok": None if r["ok"] is None else bool(r["ok"]),
+                 "started_at": r["started_at"], "finished_at": r["finished_at"],
+                 "log": json.loads(r["log"] or "[]")} for r in rows]
+
+    def clear_runs(self) -> None:
+        self.conn.execute("DELETE FROM runs"); self.conn.commit()
+
+    # --- schedules (hẹn giờ chạy kịch bản) ---
+    def create_schedule(self, d: dict) -> str:
+        sid, now = _uuid(), _now()
+        self.conn.execute(
+            "INSERT INTO schedules (id,name,script_id,profile_ids,kind,interval_min,at_time,"
+            "enabled,next_run,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (sid, d.get("name", "Lịch"), d.get("script_id"),
+             json.dumps(d.get("profile_ids") or [], ensure_ascii=False),
+             d.get("kind", "interval"), int(d.get("interval_min", 60) or 60),
+             d.get("at_time", ""), 1 if d.get("enabled", True) else 0,
+             d.get("next_run"), now, now))
+        self.conn.commit()
+        return sid
+
+    def list_schedules(self) -> list[dict]:
+        rows = self.conn.execute("SELECT * FROM schedules ORDER BY created_at").fetchall()
+        return [self._sched_row(r) for r in rows]
+
+    @staticmethod
+    def _sched_row(r: sqlite3.Row) -> dict:
+        return {"id": r["id"], "name": r["name"], "script_id": r["script_id"],
+                "profile_ids": json.loads(r["profile_ids"] or "[]"), "kind": r["kind"],
+                "interval_min": r["interval_min"], "at_time": r["at_time"],
+                "enabled": bool(r["enabled"]), "last_run": r["last_run"], "next_run": r["next_run"]}
+
+    def update_schedule(self, sid: str, d: dict) -> None:
+        cols = {"name": "name", "script_id": "script_id", "kind": "kind",
+                "interval_min": "interval_min", "at_time": "at_time", "next_run": "next_run"}
+        sets, vals = [], []
+        for k, col in cols.items():
+            if k in d:
+                sets.append(f"{col}=?"); vals.append(d[k])
+        if "profile_ids" in d:
+            sets.append("profile_ids=?"); vals.append(json.dumps(d["profile_ids"], ensure_ascii=False))
+        if "enabled" in d:
+            sets.append("enabled=?"); vals.append(1 if d["enabled"] else 0)
+        if not sets:
+            return
+        sets.append("updated_at=?"); vals.append(_now()); vals.append(sid)
+        self.conn.execute(f"UPDATE schedules SET {','.join(sets)} WHERE id=?", vals)
+        self.conn.commit()
+
+    def mark_schedule_run(self, sid: str, last_run: str, next_run: str) -> None:
+        self.conn.execute("UPDATE schedules SET last_run=?, next_run=? WHERE id=?",
+                          (last_run, next_run, sid))
+        self.conn.commit()
+
+    def delete_schedule(self, sid: str) -> None:
+        self.conn.execute("DELETE FROM schedules WHERE id=?", (sid,))
         self.conn.commit()
 
     def close(self) -> None:

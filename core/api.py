@@ -14,6 +14,7 @@ from typing import Any
 from flask import Flask, jsonify, request, send_from_directory
 
 from . import brand, browser_profiles, engines, proxy_providers
+from . import scheduler as scheduler_mod
 from .db import Database
 from .fingerprint import generate
 
@@ -151,6 +152,35 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             engines.graceful_stop(item[0], item[1], item[2])   # đóng mềm Chromium rồi terminate
             log_event("stop", f"Đóng profile {pid[:8]}")
         return {"id": pid, "stopped": bool(item)}
+
+    def _run_profile_script(pid: str, steps: list, *, engine: str | None = None,
+                            headless: bool = True, script_name: str = "",
+                            source: str = "manual") -> dict:
+        """Chạy 1 kịch bản trên 1 profile (mở nếu chưa mở) + ghi nhật ký run. Dùng chung endpoint+scheduler."""
+        from . import automation
+        p = db.get_profile(pid)
+        if not p:
+            return {"error": "profile not found"}
+        errs = automation.validate_script(steps)
+        if errs:
+            return {"error": "script lỗi: " + "; ".join(errs)}
+        rid = db.add_run(pid, p.name, script_name or "(inline)", source)
+        started = pid not in running
+        if started:
+            r = _start_one(pid, {"engine": engine, "headless": headless})
+            if r.get("error"):
+                db.finish_run(rid, False, [r["error"]])
+                return {"error": r["error"]}
+        ws, eng = running[pid][1], running[pid][2]
+        try:
+            workdir = str(Path(profiles_root) / (p.storage_path or pid))
+            result = automation.run_script(ws, steps, engine=eng, workdir=workdir)
+        finally:
+            if started:
+                _stop_one(pid)
+        db.finish_run(rid, bool(result.get("ok")), result.get("log"), result.get("data"))
+        result["run_id"] = rid
+        return result
 
     # ---- UI ----
     @app.get("/")
@@ -449,28 +479,84 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
 
     @app.post("/api/v3/profiles/<pid>/run")
     def run_automation(pid: str):
-        from . import automation
-        p = db.get_profile(pid)
-        if not p:
-            return _err("profile not found", 404)
         b = request.get_json(silent=True) or {}
-        steps = b.get("steps", [])
-        errs = automation.validate_script(steps)
-        if errs:
-            return _err("script lỗi: " + "; ".join(errs))
-        started = pid not in running
-        if started:
-            r = _start_one(pid, {"engine": b.get("engine"), "headless": b.get("headless", True)})
-            if r.get("error"):
-                return _err(r["error"], 500)
-        ws, eng = running[pid][1], running[pid][2]
-        try:
-            workdir = str(Path(profiles_root) / (p.storage_path or pid))
-            result = automation.run_script(ws, steps, engine=eng, workdir=workdir)
-        finally:
-            if started:
-                _stop_one(pid)
-        return _ok(result)
+        res = _run_profile_script(pid, b.get("steps", []), engine=b.get("engine"),
+                                  headless=b.get("headless", True),
+                                  script_name=b.get("script_name", ""))
+        if res.get("error"):
+            msg = res["error"]
+            code = 404 if "not found" in msg else (400 if "script lỗi" in msg else 500)
+            return _err(msg, code)
+        return _ok(res)
+
+    # ---- Scripts (kịch bản lưu sẵn) ----
+    @app.get("/api/v3/scripts")
+    def scripts_list():
+        return _ok(db.list_scripts())
+
+    @app.post("/api/v3/scripts")
+    def scripts_create():
+        b = request.get_json(silent=True) or {}
+        return _ok({"id": db.create_script(b.get("name", "Kịch bản"), b.get("steps") or [])})
+
+    @app.put("/api/v3/scripts/<sid>")
+    def scripts_update(sid: str):
+        b = request.get_json(silent=True) or {}
+        db.update_script(sid, name=b.get("name"), steps=b.get("steps"))
+        return _ok({"id": sid})
+
+    @app.delete("/api/v3/scripts/<sid>")
+    def scripts_delete(sid: str):
+        db.delete_script(sid)
+        return _ok({"id": sid, "deleted": True})
+
+    # ---- Runs (nhật ký chạy) ----
+    @app.get("/api/v3/runs")
+    def runs_list():
+        return _ok(db.list_runs(int(request.args.get("limit", 100)),
+                                request.args.get("profile_id")))
+
+    @app.delete("/api/v3/runs")
+    def runs_clear():
+        db.clear_runs()
+        return _ok({"cleared": True})
+
+    # ---- Schedules (hẹn giờ) ----
+    @app.get("/api/v3/schedules")
+    def schedules_list():
+        return _ok(db.list_schedules())
+
+    @app.post("/api/v3/schedules")
+    def schedules_create():
+        b = request.get_json(silent=True) or {}
+        b["next_run"] = scheduler_mod.compute_next(b).isoformat()   # không chạy ngay lúc tạo
+        return _ok({"id": db.create_schedule(b)})
+
+    @app.put("/api/v3/schedules/<sid>")
+    def schedules_update(sid: str):
+        b = request.get_json(silent=True) or {}
+        if "enabled" in b and b["enabled"]:          # bật lại -> tính lại mốc kế
+            b["next_run"] = scheduler_mod.compute_next(b).isoformat()
+        db.update_schedule(sid, b)
+        return _ok({"id": sid})
+
+    @app.delete("/api/v3/schedules/<sid>")
+    def schedules_delete(sid: str):
+        db.delete_schedule(sid)
+        return _ok({"id": sid, "deleted": True})
+
+    @app.post("/api/v3/schedules/<sid>/run-now")
+    def schedules_run_now(sid: str):
+        s = next((x for x in db.list_schedules() if x["id"] == sid), None)
+        if not s:
+            return _err("schedule not found", 404)
+        sc = db.get_script(s["script_id"]) if s.get("script_id") else None
+        steps = (sc or {}).get("steps") or []
+        fired = 0
+        for ppid in s["profile_ids"]:
+            _run_profile_script(ppid, steps, script_name=s["name"], source="manual")
+            fired += 1
+        return _ok({"fired": fired})
 
     @app.post("/api/v3/proxy/check")
     def proxy_check():
@@ -755,6 +841,13 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         except Exception as e:  # noqa: BLE001
             return _err(f"Không kết nối server: {e}")
         return _ok(r.get("data")) if r.get("success") else _err(r.get("message", "Share lỗi"), 403)
+
+    # Scheduler nền: chạy kịch bản đã lưu theo lịch (daemon, tự tắt khi thoát process).
+    _scheduler = scheduler_mod.Scheduler(
+        db, lambda pid, steps, name, src: _run_profile_script(
+            pid, steps, script_name=name, source=src))
+    _scheduler.start()
+    app.config["scheduler"] = _scheduler
 
     return app
 

@@ -340,6 +340,7 @@ const NAV=[
   {id:"trash",label:"Thùng rác",icon:"trash"},
   {sep:1},
   {id:"automation",label:"Automation",icon:"bot"},
+  {id:"schedules",label:"Lịch & Nhật ký",icon:"doc"},
   {id:"appstore",label:"App store",icon:"store"},
   {id:"cloud",label:"Cloud / Team",icon:"cloud"},
   {id:"developer",label:"Developer",icon:"code"},
@@ -415,7 +416,8 @@ function render(){
   else if(v==="profiles") el.innerHTML=viewProfiles();
   else if(v==="proxy") el.innerHTML=viewProxy();
   else if(v==="trash") {el.innerHTML=viewTrash();loadTrash();}
-  else if(v==="automation") el.innerHTML=viewAutomation();
+  else if(v==="automation"){el.innerHTML=viewAutomation();loadAuScripts();}
+  else if(v==="schedules"){el.innerHTML=viewSchedules();loadSchedules();}
   else if(v==="mcp"){el.innerHTML=viewMCP();loadMcp();}
   else if(v==="about"){el.innerHTML=viewAbout();loadAbout();}
   else if(v==="groups") el.innerHTML=viewGroups();
@@ -677,6 +679,14 @@ function viewAutomation(){const opts=STATE.profiles.map(p=>`<option value="${p.i
     <div class="inline" style="justify-content:space-between;margin-bottom:14px">
       <div style="flex:1;max-width:340px"><label>Profile</label><select id="auProf">${opts||'<option>— chưa có profile —</option>'}</select></div>
       <div class="seg" style="align-self:flex-end"><button class="${mode==='build'?'on':''}" onclick="auMode('build')">Trình dựng</button><button class="${mode==='json'?'on':''}" onclick="auMode('json')">JSON</button></div>
+    </div>
+    <div class="inline" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <label style="margin:0;align-self:center;font-size:13px" class="dim">Kịch bản đã lưu:</label>
+      <select id="auSaved" style="min-width:200px"><option value="">— chọn —</option></select>
+      <button class="btn sm" onclick="auLoadScript()">${svg(I.down)}Nạp</button>
+      <button class="btn sm" onclick="auDeleteScript()">🗑</button>
+      <div class="grow"></div>
+      <button class="btn sm pri" onclick="auSaveScript()">${svg(I.check)}Lưu kịch bản này</button>
     </div>
     ${mode==='build'?`<div id="auSteps">${auBuilder()}</div>
       <button class="btn" style="margin-top:6px" onclick="auAddStep()">${svg(I.plus)}Thêm bước</button>`
@@ -1053,6 +1063,69 @@ function viewAppStore(){return `<div class="phead"><h1>App <em>store</em></h1><p
        <span class="dim" style="font-size:12px">${t.steps.length} bước</span></div></div>`).join("")}
   </div>`;}
 function useTemplate(i){STATE.autoSteps=JSON.parse(JSON.stringify(TEMPLATES[i].steps));STATE.autoMode="build";go("automation");toast("Đã nạp kịch bản — chọn profile rồi Chạy","ok");}
+
+/* ----- Kịch bản lưu sẵn (Automation) ----- */
+async function loadAuScripts(){try{STATE.auScripts=await j(`${API}/scripts`);}catch(e){STATE.auScripts=[];}
+  const sel=document.getElementById("auSaved");if(sel)sel.innerHTML='<option value="">— chọn —</option>'+(STATE.auScripts||[]).map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("");}
+async function auSaveScript(){let steps;try{steps=auGetSteps();}catch(e){return toast("JSON lỗi","err");}
+  if(!steps.length)return toast("Chưa có bước nào","");
+  const name=prompt("Tên kịch bản:","Kịch bản "+(((STATE.auScripts||[]).length)+1));if(!name)return;
+  try{await j(`${API}/scripts`,body({name,steps}));toast("Đã lưu kịch bản","ok");loadAuScripts();}catch(e){toast(e.message,"err");}}
+function auLoadScript(){const id=val("auSaved");if(!id)return;const s=(STATE.auScripts||[]).find(x=>x.id===id);if(!s)return;
+  STATE.autoSteps=JSON.parse(JSON.stringify(s.steps));STATE.autoMode="build";render();toast("Đã nạp: "+s.name,"ok");}
+async function auDeleteScript(){const id=val("auSaved");if(!id)return toast("Chọn kịch bản trước","");if(!confirm("Xoá kịch bản đã lưu này?"))return;
+  try{await j(`${API}/scripts/${id}`,{method:"DELETE"});toast("Đã xoá","");loadAuScripts();}catch(e){toast(e.message,"err");}}
+
+/* ----- Lịch & Nhật ký (schedules + runs) ----- */
+function fmtTime(iso){if(!iso)return "—";const d=new Date(iso);return isNaN(d.getTime())?"—":d.toLocaleString();}
+function viewSchedules(){return `<div class="phead"><h1>Lịch & <em>Nhật ký</em></h1><p>Hẹn giờ chạy kịch bản đã lưu trên nhiều profile + xem lịch sử chạy. Lưu kịch bản ở màn Automation trước.</p></div>
+  <div class="split" style="grid-template-columns:1fr 1fr;align-items:start">
+    <div class="card" style="padding:20px"><div class="inline" style="justify-content:space-between"><b>Lịch chạy</b><button class="btn sm pri" onclick="schNew()">${svg(I.plus)}Thêm lịch</button></div>
+      <div id="schForm"></div>
+      <div id="schList" class="dim" style="margin-top:12px">Đang tải...</div></div>
+    <div class="card" style="padding:20px"><div class="inline" style="justify-content:space-between"><b>Nhật ký chạy</b><button class="btn sm" onclick="clearRuns()">Xoá nhật ký</button></div>
+      <div id="runList" class="dim" style="margin-top:12px;max-height:540px;overflow:auto">Đang tải...</div></div>
+  </div>`;}
+async function loadSchedules(){try{STATE.schedules=await j(`${API}/schedules`);STATE.scripts=await j(`${API}/scripts`);}catch(e){}
+  renderSchList();loadRuns();}
+function renderSchList(){const el=document.getElementById("schList");if(!el)return;const ss=STATE.schedules||[];
+  if(!ss.length){el.innerHTML='<p class="dim" style="padding:6px 0">Chưa có lịch nào — bấm <b>Thêm lịch</b>.</p>';return;}
+  el.innerHTML=ss.map(s=>{const sc=(STATE.scripts||[]).find(x=>x.id===s.script_id);
+    return `<div class="austep" style="align-items:center">
+      <span class="dot ${s.enabled?'ok':''}" title="${s.enabled?'đang bật':'tắt'}"></span>
+      <div style="flex:1;min-width:0"><b>${esc(s.name)}</b> <span class="dim" style="font-size:12px">· ${s.kind==='daily'?('hằng ngày '+esc(s.at_time)):('mỗi '+s.interval_min+' phút')} · ${(s.profile_ids||[]).length} profile · ${esc(sc?sc.name:'(kịch bản đã xoá)')}</span>
+        <div class="dim" style="font-size:12px">Kế tiếp: ${s.enabled?fmtTime(s.next_run):'—'} · lần cuối: ${s.last_run?fmtAgo(s.last_run):'chưa'}</div></div>
+      <span class="gp"><button class="btn sm" onclick="schRunNow('${s.id}')" title="Chạy ngay">▶</button>
+        <button class="btn sm" onclick="schToggle('${s.id}',${s.enabled?0:1})">${s.enabled?'Tắt':'Bật'}</button>
+        <button class="btn sm" onclick="schDel('${s.id}')">🗑</button></span></div>`;}).join("");}
+async function loadRuns(){let runs=[];try{runs=await j(`${API}/runs?limit=60`);}catch(e){}
+  const el=document.getElementById("runList");if(!el)return;
+  el.innerHTML=runs.length?runs.map(r=>`<div class="austep" style="align-items:center">
+    <span class="dot ${r.ok===true?'ok':(r.ok===false?'err':'')}"></span>
+    <div style="flex:1;min-width:0"><b>${esc(r.profile_name||'')}</b> <span class="dim" style="font-size:12px">· ${esc(r.script_name||'')} · ${r.source==='schedule'?'lịch':'tay'}</span>
+      <div class="dim" style="font-size:12px">${fmtTime(r.started_at)} · ${r.ok===null?'đang chạy…':(r.ok?'✓ OK':'✗ LỖI')}</div></div></div>`).join(""):'<p class="dim" style="padding:6px 0">Chưa có lần chạy nào.</p>';}
+async function clearRuns(){if(!confirm("Xoá toàn bộ nhật ký chạy?"))return;try{await j(`${API}/runs`,{method:"DELETE"});loadRuns();}catch(e){}}
+function schNew(){const el=document.getElementById("schForm");if(!el)return;
+  const scripts=STATE.scripts||[],profs=STATE.profiles||[];
+  if(!scripts.length){toast("Chưa có kịch bản đã lưu — qua Automation bấm 'Lưu kịch bản này' trước","err");return;}
+  el.innerHTML=`<div class="card" style="padding:14px;margin-top:10px;border:1px solid var(--primary)">
+    <label>Tên lịch</label><input id="schName" value="Lịch mới">
+    <label style="margin-top:8px">Kịch bản</label><select id="schScript">${scripts.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select>
+    <label style="margin-top:8px">Chu kỳ</label><select id="schKind" onchange="schKindChange()"><option value="interval">Mỗi N phút</option><option value="daily">Hằng ngày lúc</option></select>
+    <div id="schIntWrap" style="margin-top:6px"><input id="schInt" type="number" value="60" placeholder="số phút"></div>
+    <div id="schTimeWrap" style="margin-top:6px;display:none"><input id="schTime" value="09:00" placeholder="HH:MM"></div>
+    <label style="margin-top:8px">Profile áp dụng</label>
+    <div style="max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">${profs.length?profs.map(p=>`<label style="display:block;font-weight:400;cursor:pointer"><input type="checkbox" class="schProf" value="${p.id}"> ${esc(p.name)}</label>`).join(""):'<span class="dim">Chưa có profile</span>'}</div>
+    <div class="toolbar" style="margin-top:10px"><button class="btn pri" onclick="schSave()">Lưu lịch</button><button class="btn" onclick="document.getElementById('schForm').innerHTML=''">Huỷ</button></div>
+  </div>`;}
+function schKindChange(){const k=val("schKind");const iw=document.getElementById("schIntWrap"),tw=document.getElementById("schTimeWrap");if(iw)iw.style.display=k==='interval'?'':'none';if(tw)tw.style.display=k==='daily'?'':'none';}
+async function schSave(){const ids=[...document.querySelectorAll(".schProf:checked")].map(x=>x.value);
+  if(!ids.length)return toast("Chọn ít nhất 1 profile","err");
+  const d={name:val("schName")||"Lịch",script_id:val("schScript"),profile_ids:ids,kind:val("schKind"),interval_min:Number(val("schInt"))||60,at_time:val("schTime")||""};
+  try{await j(`${API}/schedules`,body(d));document.getElementById("schForm").innerHTML="";toast("Đã tạo lịch","ok");loadSchedules();}catch(e){toast(e.message,"err");}}
+async function schToggle(id,en){try{await j(`${API}/schedules/${id}`,{...H,method:"PUT",body:JSON.stringify({enabled:!!en})});loadSchedules();}catch(e){toast(e.message,"err");}}
+async function schDel(id){if(!confirm("Xoá lịch này?"))return;try{await j(`${API}/schedules/${id}`,{method:"DELETE"});loadSchedules();}catch(e){}}
+async function schRunNow(id){try{const r=await j(`${API}/schedules/${id}/run-now`,body({}));toast(`Đang chạy ${r.fired} profile…`,"ok");setTimeout(loadRuns,2000);}catch(e){toast(e.message,"err");}}
 
 /* ----- Cloud / Team ----- */
 function viewCloud(){return `<div class="phead"><h1>Cloud / <em>Team</em></h1><p>Đồng bộ profile đa máy + chia sẻ đội nhóm qua private server tự host.</p></div>
