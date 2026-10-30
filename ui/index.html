@@ -239,6 +239,14 @@
   .inline{display:flex;align-items:center;gap:12px}
   .mfoot{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--line);background:#fffafd}
   .checkline{display:flex;align-items:center;gap:9px;font-weight:600;color:#5a5260;margin-bottom:14px}
+  /* thẻ Nâng cao + công tắc tổng (Master Power) */
+  .advbox{border:1px solid var(--line2);border-radius:12px;padding:14px 16px;margin-top:16px;background:#fffafd}
+  .advbox .advhead{display:flex;align-items:center;gap:10px}
+  .advbox .advhead b{font-size:14px;font-weight:600}
+  .advbox .advbody{margin-top:12px;transition:.15s}
+  .advbox .advbody.off{opacity:.45;filter:grayscale(.35)}
+  .advbox .advbody .checkline:last-child,.advbox .advbody .field:last-child{margin-bottom:0}
+  [data-theme="dark"] .advbox{background:#241d30}
 
   /* toast */
   #toast{position:fixed;right:22px;bottom:22px;background:#241b2b;color:#fff;border-radius:12px;padding:13px 18px 13px 40px;
@@ -1306,11 +1314,15 @@ function renderCreate(){
     </div>
    </div>
    <div class="mfoot"><button class="btn" onclick="show(false)">Huỷ</button><button class="btn pri" onclick="doCreate()">${svg(I.plus)}Tạo profile</button></div></div>`;
-  updateSum();
+  updateSum();toggleAdv('c');
 }
 function switchTab(t){CT.tab=t;
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tt===t));
   document.querySelectorAll('.tabpanel').forEach(p=>p.style.display=p.dataset.tp===t?'block':'none');}
+/* Master Power: bật/tắt cả cụm Nâng cao. Tắt = disable + làm mờ (profile chạy sạch) */
+function toggleAdv(p){const on=document.getElementById(p+'Master')?.checked;const b=document.getElementById(p+'AdvBody');if(!b)return;
+  b.classList.toggle('off',!on);
+  b.querySelectorAll('input,select,button,textarea').forEach(el=>{el.disabled=!on;});}
 function createTab(bro){
   const P=(id,html)=>`<div class="tabpanel" data-tp="${id}" style="display:${CT.tab===id?'block':'none'}">${html}</div>`;
   return P("nhanh",`
@@ -1324,7 +1336,6 @@ function createTab(bro){
       <div style="flex:1"><label>OS</label><select id="cOs" onchange="updateSum()"><option>Windows</option><option>macOS</option><option>Linux</option></select></div>
     </div>
     <div class="field" style="margin-top:16px"><label>Engine</label><select id="cEngine"><option value="">auto (Chromium→ovobrowser)</option><option value="ovobrowser">ovobrowser (Chrome, khuyến nghị)</option><option value="camoufox">camoufox (Firefox)</option><option value="fpchromium">fpchromium</option><option value="botbrowser">botbrowser (premium)</option></select></div>
-    <div class="field"><label>Phiên bản Chrome <span class="dim" style="font-weight:400">· khoá version cho nick (tải thêm ở tab Engine)</span></label><select id="cEngineVer"><option value="">Mặc định (gói sẵn)</option>${((STATE.engines&&STATE.engines.installed)||[]).filter(e=>!e.builtin).map(e=>`<option value="${esc(e.version)}">Chrome ${esc(e.version)}</option>`).join("")}</select></div>
     <div class="field"><label>URL khởi động</label><input id="cUrl" placeholder="https://example.com"></div>
     <div class="field"><label>Proxy <a style="float:right;color:var(--primary);font-weight:700;cursor:pointer" onclick="useLibPrx()">Chọn từ thư viện</a></label>
       <input id="cProxy" placeholder="host:port:user:pass  (tự nhận http/socks5, trống = không proxy)"></div>
@@ -1336,11 +1347,18 @@ function createTab(bro){
       <div><label>Màu nhãn</label><input id="cColor" type="color" value="#EA1A87" style="height:42px;padding:4px;width:58px"></div>
     </div>
     <div class="checkline" style="margin-top:14px"><label class="toggle"><input id="cPin" type="checkbox"><span></span></label> Ghim lên đầu</div>
-    <div class="checkline"><label class="toggle"><input id="cBandwidth" type="checkbox"><span></span></label> Tiết kiệm băng thông <span class="dim" style="font-size:12px">(chặn tải ảnh — farm nhiều nick, đỡ tốn proxy)</span></div>
-    <div class="field" style="margin-top:12px"><label>Camera giả <span class="dim" style="font-weight:400">· video <code>.y4m</code> feed vào webcam (KYC/liveness; trống = tắt)</span></label>
-      <div class="inline" style="gap:8px"><input id="cFakeCam" placeholder="C:\\video\\face.y4m" style="flex:1"><button type="button" class="btn" onclick="pickFile('cFakeCam','Video|*.y4m;*.mp4;*.mov;*.avi;*.webm|All|*.*','y4m')">Browse</button></div></div>
-    <div class="field"><label>Micro giả <span class="dim" style="font-weight:400">· audio <code>.wav</code> feed vào mic (trống = tắt)</span></label>
-      <div class="inline" style="gap:8px"><input id="cFakeMic" placeholder="C:\\audio\\voice.wav" style="flex:1"><button type="button" class="btn" onclick="pickFile('cFakeMic','Audio|*.wav;*.mp3;*.m4a;*.aac|All|*.*','wav')">Browse</button></div></div>`)
+    <div class="advbox">
+      <div class="advhead"><label class="toggle"><input id="cMaster" type="checkbox" ${CT.adv?'checked':''} onchange="CT.adv=this.checked;toggleAdv('c')"><span></span></label>
+        <b>Nâng cao · chống phát hiện</b><span class="dim" style="font-size:12px;margin-left:auto">Bật để tinh chỉnh từng mục</span></div>
+      <div class="advbody ${CT.adv?'':'off'}" id="cAdvBody">
+        <div class="checkline" style="margin-bottom:0"><label class="toggle"><input id="cBandwidth" type="checkbox"><span></span></label> Tiết kiệm băng thông <span class="dim" style="font-size:12px">(chặn tải ảnh — farm nhiều nick, đỡ tốn proxy)</span></div>
+        <div class="field" style="margin-top:12px"><label>Phiên bản Chrome <span class="dim" style="font-weight:400">· khoá version cho nick (tải thêm ở tab Engine)</span></label><select id="cEngineVer"><option value="">Mặc định (gói sẵn)</option>${((STATE.engines&&STATE.engines.installed)||[]).filter(e=>!e.builtin).map(e=>`<option value="${esc(e.version)}">Chrome ${esc(e.version)}</option>`).join("")}</select></div>
+        <div class="field"><label>Camera giả <span class="dim" style="font-weight:400">· video <code>.y4m</code> feed vào webcam (KYC/liveness; trống = tắt)</span></label>
+          <div class="inline" style="gap:8px"><input id="cFakeCam" placeholder="C:\\video\\face.y4m" style="flex:1"><button type="button" class="btn" onclick="pickFile('cFakeCam','Video|*.y4m;*.mp4;*.mov;*.avi;*.webm|All|*.*','y4m')">Browse</button></div></div>
+        <div class="field" style="margin-bottom:0"><label>Micro giả <span class="dim" style="font-weight:400">· audio <code>.wav</code> feed vào mic (trống = tắt)</span></label>
+          <div class="inline" style="gap:8px"><input id="cFakeMic" placeholder="C:\\audio\\voice.wav" style="flex:1"><button type="button" class="btn" onclick="pickFile('cFakeMic','Audio|*.wav;*.mp3;*.m4a;*.aac|All|*.*','wav')">Browse</button></div></div>
+      </div>
+    </div>`)
   + P("ketnoi",`
     <div class="field"><label>WebRTC</label><select><option>Theo IP (khuyến nghị)</option><option>Tắt</option><option>Thật</option></select></div>
     <div class="field"><label>Vị trí địa lý</label><select><option>Tự động theo IP</option><option>Hỏi khi truy cập</option><option>Chặn</option></select></div>
@@ -1390,7 +1408,8 @@ async function doCreate(){
   // meta chung (tags/note/màu/ghim) áp cho mọi profile tạo ra
   const tags=val("cTags").split(",").map(t=>t.trim()).filter(Boolean);
   const color=val("cColor"), note=val("cNote"), pinned=document.getElementById("cPin")?.checked;
-  const bandwidth=document.getElementById("cBandwidth")?.checked, engineVer=val("cEngineVer"), fakeCam=val("cFakeCam"), fakeMic=val("cFakeMic");
+  const advOn=document.getElementById("cMaster")?.checked;   // Master Power: tắt -> bỏ qua toàn bộ spoof nâng cao
+  const bandwidth=advOn&&document.getElementById("cBandwidth")?.checked, engineVer=advOn?val("cEngineVer"):"", fakeCam=advOn?val("cFakeCam"):"", fakeMic=advOn?val("cFakeMic"):"";
   const hasMeta=tags.length||note||pinned||(color&&color.toLowerCase()!=="#ea1a87");
   const applyExtras=async pid=>{
     if(proxy) await j(`${API}/profiles/${pid}/proxy`,body({raw_proxy:proxy})).catch(()=>{});
@@ -1467,18 +1486,23 @@ async function editP(id){
       </div>
       <div class="checkline"><label class="toggle"><input id="eDnt" type="checkbox" ${nav.do_not_track?'checked':''}><span></span></label> Do Not Track</div>
       <p class="dim" style="font-size:13px">Noise/Masked = mỗi profile vân tay riêng (chống link). Real = để lộ máy thật.</p>
-      <div style="border-top:1px solid var(--line);margin:16px 0 12px"></div><b style="font-size:13px">Nâng cao</b>
-      <div class="checkline" style="margin-top:8px"><label class="toggle"><input id="eBandwidth" type="checkbox" ${dyn.save_bandwidth?'checked':''}><span></span></label> Tiết kiệm băng thông (chặn tải ảnh)</div>
-      <div class="field" style="margin-top:10px"><label>Phiên bản Chrome <span class="dim" style="font-weight:400">· khoá version cho nick</span></label><select id="eEngineVer">${engOpts}</select></div>
-      <div class="split" style="grid-template-columns:1fr 1fr">
-        <div class="field"><label>Camera giả (.y4m)</label><div class="inline" style="gap:6px"><input id="eFakeCam" value="${esc(dyn.fake_camera||'')}" placeholder="C:\\video\\face.y4m" style="flex:1"><button type="button" class="btn sm" onclick="pickFile('eFakeCam','Video|*.y4m;*.mp4;*.mov;*.avi;*.webm|All|*.*','y4m')">Browse</button></div></div>
-        <div class="field"><label>Micro giả (.wav)</label><div class="inline" style="gap:6px"><input id="eFakeMic" value="${esc(dyn.fake_mic||'')}" placeholder="C:\\audio\\voice.wav" style="flex:1"><button type="button" class="btn sm" onclick="pickFile('eFakeMic','Audio|*.wav;*.mp3;*.m4a;*.aac|All|*.*','wav')">Browse</button></div></div>
+      <div class="advbox">
+        <div class="advhead"><label class="toggle"><input id="eMaster" type="checkbox" ${(dyn.save_bandwidth||dyn.engine_version||dyn.fake_camera||dyn.fake_mic)?'checked':''} onchange="toggleAdv('e')"><span></span></label>
+          <b>Nâng cao · chống phát hiện</b><span class="dim" style="font-size:12px;margin-left:auto">Tắt = chạy sạch, bỏ spoof thêm</span></div>
+        <div class="advbody ${(dyn.save_bandwidth||dyn.engine_version||dyn.fake_camera||dyn.fake_mic)?'':'off'}" id="eAdvBody">
+          <div class="checkline" style="margin-bottom:0"><label class="toggle"><input id="eBandwidth" type="checkbox" ${dyn.save_bandwidth?'checked':''}><span></span></label> Tiết kiệm băng thông (chặn tải ảnh)</div>
+          <div class="field" style="margin-top:12px"><label>Phiên bản Chrome <span class="dim" style="font-weight:400">· khoá version cho nick</span></label><select id="eEngineVer">${engOpts}</select></div>
+          <div class="split" style="grid-template-columns:1fr 1fr;margin-bottom:0">
+            <div class="field" style="margin-bottom:0"><label>Camera giả (.y4m)</label><div class="inline" style="gap:6px"><input id="eFakeCam" value="${esc(dyn.fake_camera||'')}" placeholder="C:\\video\\face.y4m" style="flex:1"><button type="button" class="btn sm" onclick="pickFile('eFakeCam','Video|*.y4m;*.mp4;*.mov;*.avi;*.webm|All|*.*','y4m')">Browse</button></div></div>
+            <div class="field" style="margin-bottom:0"><label>Micro giả (.wav)</label><div class="inline" style="gap:6px"><input id="eFakeMic" value="${esc(dyn.fake_mic||'')}" placeholder="C:\\audio\\voice.wav" style="flex:1"><button type="button" class="btn sm" onclick="pickFile('eFakeMic','Audio|*.wav;*.mp3;*.m4a;*.aac|All|*.*','wav')">Browse</button></div></div>
+          </div>
+        </div>
       </div>`)}
     ${EP_("cookies",`<div class="field"><label>Nạp cookies (JSON hoặc Netscape)</label><textarea id="eCookies" rows="8" class="mono" style="resize:vertical" placeholder='[{"name":"...","value":"...","domain":".facebook.com"}]'></textarea></div>
       <p class="dim" style="font-size:13px">Dán cookie rồi Lưu — sẽ nạp vào profile ở lần Mở tới. Để trống nếu không đổi.</p>`)}
    </div>
    <div class="mfoot"><button class="btn" onclick="show(false)">Huỷ</button><button class="btn pri" onclick="saveEdit()">${svg(I.check)}Lưu thay đổi</button></div></div>`;
-  show(true);}
+  show(true);toggleAdv('e');}
 async function saveEdit(){const id=EP.id,fp=EP.fp;
   fp.navigator=fp.navigator||{};fp.screen=fp.screen||{};fp.webgl_meta_data=fp.webgl_meta_data||{};
   fp.canvas=fp.canvas||{};fp.client_rect=fp.client_rect||{};fp.webgl_image=fp.webgl_image||{};fp.audio_context=fp.audio_context||{};
@@ -1491,7 +1515,8 @@ async function saveEdit(){const id=EP.id,fp=EP.fp;
     await j(`${API}/profiles/update/${id}`,body({name:val("eName"),group_id:val("eGroup")||null,fingerprint_data:fp}));
     await j(`${API}/profiles/${id}/meta`,body({note:val("eNote"),color:val("eColor"),pinned:document.getElementById("ePin").checked,tags:val("eTags").split(",").map(t=>t.trim()).filter(Boolean)}));
     await j(`${API}/profiles/${id}/timezone`,body({timezone:val("eTz")}));
-    await j(`${API}/profiles/${id}/options`,body({save_bandwidth:!!document.getElementById("eBandwidth")?.checked,engine_version:val("eEngineVer")||"",fake_camera:val("eFakeCam")||"",fake_mic:val("eFakeMic")||""})).catch(()=>{});
+    const em=document.getElementById("eMaster")?.checked;   // Master tắt -> lưu sạch, xoá spoof cũ
+    await j(`${API}/profiles/${id}/options`,body({save_bandwidth:!!(em&&document.getElementById("eBandwidth")?.checked),engine_version:em?(val("eEngineVer")||""):"",fake_camera:em?(val("eFakeCam")||""):"",fake_mic:em?(val("eFakeMic")||""):""})).catch(()=>{});
     const ck=val("eCookies").trim();if(ck) await j(`${API}/profiles/${id}/cookies`,body({cookies:ck})).catch(()=>{});
     show(false);toast("Đã lưu","ok");refresh();
   }catch(e){toast(e.message,"err");}}
