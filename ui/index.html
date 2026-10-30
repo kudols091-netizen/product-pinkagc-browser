@@ -1622,7 +1622,9 @@ function openProxy(id){const p=STATE.profiles.find(x=>x.id===id)||{};
   document.getElementById("overlay").innerHTML=`<div class="modal sm">
    <div class="mhead"><div class="ic">${svg(I.globe)}</div><h2>Gán proxy</h2><button class="x" onclick="show(false)">✕</button></div>
    <div class="mbody">
-    <div class="field"><label>Proxy (dán trần — tự nhận http/socks5)</label><input id="apRaw" placeholder="host:port:user:pass"></div>
+    ${STATE.proxies.length?`<div class="field"><label>Chọn từ thư viện proxy <span class="dim" style="font-weight:400">· ${STATE.proxies.length} proxy đã lưu</span></label>
+      <select id="apLib" onchange="apPickLib(this.value)"><option value="">— chọn proxy đã lưu —</option>${STATE.proxies.map(x=>{const m=x.meta||{};const dot=m.alive?'🟢':(m.alive===false?'🔴':'⚪');return `<option value="${esc(x.raw_proxy)}">${dot} ${esc((x.raw_proxy||'').split('://').pop())}${m.country?' · '+esc(m.country):''}${m.latency_ms!=null?' · '+m.latency_ms+'ms':''}</option>`;}).join("")}</select></div>`:''}
+    <div class="field"><label>${STATE.proxies.length?'Hoặc dán proxy trần':'Proxy (dán trần — tự nhận http/socks5)'}</label><input id="apRaw" placeholder="host:port:user:pass"></div>
     <div class="field"><label>Hoặc provider</label><select id="apProv"><option value="">— nhập raw —</option>${STATE.providers.map(p=>`<option>${esc(p)}</option>`).join("")}</select></div>
     <div class="field"><label>API key (nếu dùng provider)</label><input id="apKey" placeholder="api_key"></div>
     <div id="apSt" class="prxres"></div>
@@ -1642,6 +1644,7 @@ async function apCheck(){
   }catch(e){st.className="prxres show err";st.textContent=e.message;}
   finally{if(btn)btn.disabled=false;}
 }
+function apPickLib(raw){const el=document.getElementById("apRaw");if(el&&raw)el.value=raw;const st=document.getElementById("apSt");if(st){st.className="prxres";st.textContent="";}}
 async function apSave(id){const prov=val("apProv");const payload=prov?{provider:prov,api_key:val("apKey")}:{raw_proxy:val("apRaw")};try{const d=await j(`${API}/profiles/${id}/proxy`,body(payload));show(false);toast("Proxy: "+(d.raw_proxy||'(trống)'),"ok");refresh();}catch(e){toast(e.message,"err");}}
 
 /* ================= BOOT ================= */
