@@ -94,6 +94,8 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         "start_url": "", "chrome_params": "", "clear_cache": True, "limit_window": True,
         # AI dựng kịch bản (gap #3b) — provider openai-compatible hoặc gemini
         "ai_provider": "openai", "ai_base_url": "", "ai_key": "", "ai_model": "",
+        # engine đa-version: URL manifest các bản Chrome/ovobrowser tải thêm
+        "engines_url": "https://agency.pinkagc.com/browser/engines.json",
     }
 
     def _load_settings() -> dict:
@@ -523,11 +525,14 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             return _err("profile not found", 404)
         b = request.get_json(silent=True) or {}
         dyn = p.dynamic_data or {}
-        for k in ("save_bandwidth",):                 # whitelist cờ cho phép set
+        for k in ("save_bandwidth",):                 # whitelist cờ bool
             if k in b:
                 dyn[k] = bool(b[k])
+        if "engine_version" in b:                      # khoá version engine cho profile
+            dyn["engine_version"] = str(b["engine_version"] or "")
         db.set_dynamic_data(pid, dyn)
-        return _ok({"id": pid, "save_bandwidth": dyn.get("save_bandwidth", False)})
+        return _ok({"id": pid, "save_bandwidth": dyn.get("save_bandwidth", False),
+                    "engine_version": dyn.get("engine_version", "")})
 
     @app.post("/api/v3/ai/workflow")
     def ai_workflow():
@@ -541,6 +546,38 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         if res.get("error") and not res.get("steps"):
             return _err(res["error"])
         return _ok(res)
+
+    # ---- Engines (đa-version: built-in + tải thêm theo yêu cầu) ----
+    @app.get("/api/v3/engines")
+    def engines_list():
+        from . import engine_store
+        installed = engine_store.list_installed()
+        iv = {e["version"] for e in installed}
+        cat = engine_store.fetch_catalog(_load_settings().get("engines_url", ""))
+        available = [c for c in cat if c.get("version") not in iv]
+        return _ok({"installed": installed, "available": available,
+                    "status": engine_store.download_status()})
+
+    @app.post("/api/v3/engines/download")
+    def engines_download():
+        from . import engine_store
+        b = request.get_json(silent=True) or {}
+        ver, url = b.get("version"), b.get("url")
+        if not ver or not url:
+            return _err("thiếu version hoặc url")
+        engine_store.download_async(ver, url)         # tải nền, poll /engines/status
+        return _ok({"started": True, "version": ver})
+
+    @app.get("/api/v3/engines/status")
+    def engines_status():
+        from . import engine_store
+        return _ok(engine_store.download_status())
+
+    @app.delete("/api/v3/engines/<version>")
+    def engines_delete(version: str):
+        from . import engine_store
+        engine_store.delete_version(version)
+        return _ok({"version": version, "deleted": True})
 
     # ---- Scripts (kịch bản lưu sẵn) ----
     @app.get("/api/v3/scripts")

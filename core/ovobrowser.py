@@ -90,9 +90,10 @@ def serve(profile_fp: dict, profile_dyn: dict, profiles_root: str | Path, *,
           storage_name: str, headless: bool = True, port: int = 9222,
           seed: int | None = None, noise: bool = True) -> tuple[Any, str]:
     """Spawn ovobrowser, trả (proc, cdp_ws). Cần OVOBROWSER_BIN."""
-    binary = os.environ.get("OVOBROWSER_BIN")
+    from . import engine_store                   # khoá version per-profile: dùng binary của engine_version nếu đã tải
+    binary = engine_store.resolve_binary((profile_dyn or {}).get("engine_version"))
     if not binary or not Path(binary).exists():
-        raise RuntimeError("Chưa cấu hình OVOBROWSER_BIN (binary chrome của ovobrowser).")
+        raise RuntimeError("Chưa cấu hình engine (OVOBROWSER_BIN) hoặc version đã chọn chưa tải về.")
     n = parse_gpm(profile_fp, profile_dyn)
     if seed is None:
         seed = (profile_dyn or {}).get("fp_seed") or seed_for(storage_name)

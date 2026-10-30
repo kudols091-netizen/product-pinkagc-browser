@@ -341,6 +341,7 @@ const NAV=[
   {sep:1},
   {id:"automation",label:"Automation",icon:"bot"},
   {id:"schedules",label:"Lịch & Nhật ký",icon:"doc"},
+  {id:"engines",label:"Engine",icon:"plug"},
   {id:"appstore",label:"App store",icon:"store"},
   {id:"cloud",label:"Cloud / Team",icon:"cloud"},
   {id:"developer",label:"Developer",icon:"code"},
@@ -418,6 +419,7 @@ function render(){
   else if(v==="trash") {el.innerHTML=viewTrash();loadTrash();}
   else if(v==="automation"){el.innerHTML=viewAutomation();loadAuScripts();}
   else if(v==="schedules"){el.innerHTML=viewSchedules();loadSchedules();}
+  else if(v==="engines"){el.innerHTML=viewEngines();loadEngines();}
   else if(v==="mcp"){el.innerHTML=viewMCP();loadMcp();}
   else if(v==="about"){el.innerHTML=viewAbout();loadAbout();}
   else if(v==="groups") el.innerHTML=viewGroups();
@@ -1165,6 +1167,28 @@ async function schToggle(id,en){try{await j(`${API}/schedules/${id}`,{...H,metho
 async function schDel(id){if(!confirm("Xoá lịch này?"))return;try{await j(`${API}/schedules/${id}`,{method:"DELETE"});loadSchedules();}catch(e){}}
 async function schRunNow(id){try{const r=await j(`${API}/schedules/${id}/run-now`,body({}));toast(`Đang chạy ${r.fired} profile…`,"ok");setTimeout(loadRuns,2000);}catch(e){toast(e.message,"err");}}
 
+/* ----- Engine đa-version (tải theo yêu cầu + khoá version per-profile) ----- */
+let ENGPOLL=null;
+function viewEngines(){return `<div class="phead"><h1>Engine <em>trình duyệt</em></h1><p>Mỗi profile khoá 1 phiên bản Chrome riêng (fingerprint ổn định theo đời nick + đa dạng version tránh lộ pattern). Tải thêm version theo yêu cầu.</p></div>
+  <div id="engBody" class="dim" style="padding:12px">Đang tải...</div>`;}
+async function loadEngines(){let d;try{d=await j(`${API}/engines`);}catch(e){const b=document.getElementById("engBody");if(b)b.textContent="Lỗi: "+e.message;return;}
+  STATE.engines=d;renderEngines();
+  clearTimeout(ENGPOLL);
+  if(Object.values(d.status||{}).some(s=>s.state==='downloading'||s.state==='extracting'))ENGPOLL=setTimeout(loadEngines,2000);}
+function renderEngines(){const b=document.getElementById("engBody");if(!b)return;const d=STATE.engines||{},st=d.status||{};
+  const inst=(d.installed||[]).map(e=>`<div class="austep" style="align-items:center">
+    <span class="dot ok"></span><div style="flex:1"><b>Chrome ${esc(e.version)}</b>${e.builtin?' <span class="dim" style="font-size:12px">· gói sẵn</span>':''}</div>
+    ${e.builtin?'':`<button class="btn sm" onclick="engDelete('${esc(e.version)}')">🗑</button>`}</div>`).join("")||'<p class="dim">Chưa có engine.</p>';
+  const avail=(d.available||[]).map(e=>{const p=st[e.version],busy=p&&(p.state==='downloading'||p.state==='extracting');
+    return `<div class="austep" style="align-items:center"><span class="dot"></span>
+    <div style="flex:1"><b>Chrome ${esc(e.version)}</b> <span class="dim" style="font-size:12px">· ${e.size?('≈'+Math.round(e.size/1048576)+' MB'):'tải thêm'}${busy?(' · '+(p.state==='extracting'?'giải nén…':('tải '+p.pct+'%'))):''}${p&&p.state==='error'?(' · lỗi'):''}</span></div>
+    <button class="btn sm pri" ${busy?'disabled':''} onclick="engDownload('${esc(e.version)}','${esc(e.url)}')">${busy?'…':'⬇ Tải'}</button></div>`;}).join("")||'<p class="dim" style="font-size:13px">Không có bản để tải — cấu hình <code>engines_url</code> (manifest engines.json) ở Cài đặt, hoặc bản gói sẵn đã đủ dùng.</p>';
+  b.innerHTML=`<div class="split" style="grid-template-columns:1fr 1fr;align-items:start">
+    <div class="card" style="padding:18px"><b>Đã cài</b><div style="margin-top:10px">${inst}</div></div>
+    <div class="card" style="padding:18px"><b>Tải thêm</b><div style="margin-top:10px">${avail}</div></div></div>`;}
+async function engDownload(ver,url){try{await j(`${API}/engines/download`,body({version:ver,url}));toast("Bắt đầu tải Chrome "+ver,"ok");loadEngines();}catch(e){toast(e.message,"err");}}
+async function engDelete(ver){if(!confirm("Xoá engine "+ver+"?"))return;try{await j(`${API}/engines/${ver}`,{method:"DELETE"});toast("Đã xoá","");loadEngines();}catch(e){toast(e.message,"err");}}
+
 /* ----- Cloud / Team ----- */
 function viewCloud(){return `<div class="phead"><h1>Cloud / <em>Team</em></h1><p>Đồng bộ profile đa máy + chia sẻ đội nhóm qua private server tự host.</p></div>
   <div id="cloudBody" class="dim" style="padding:18px">Đang tải...</div>`;}
@@ -1249,7 +1273,8 @@ async function checkPrx(id){const x=STATE.proxies.find(p=>p.id===id);if(!x)retur
 
 /* ================= CREATE / EDIT MODAL ================= */
 let CT={tab:"nhanh",proxyChk:""};
-function openCreate(){CT={tab:"nhanh",proxyChk:""};renderCreate();show(true);}
+function openCreate(){CT={tab:"nhanh",proxyChk:""};renderCreate();show(true);
+  j(`${API}/engines`).then(d=>{STATE.engines=d;if(document.getElementById("cEngineVer"))renderCreate();}).catch(()=>{});}
 function show(on){document.getElementById("overlay").classList.toggle("show",on);if(!on)document.getElementById("overlay").innerHTML="";}
 function renderCreate(){
   const bro=STATE.browsers.length?STATE.browsers.map(b=>`<option value="${b.value}">${esc(b.label)} (${b.engine})</option>`).join(""):'<option value="Chrome">Chrome</option>';
@@ -1288,6 +1313,7 @@ function createTab(bro){
       <div style="flex:1"><label>OS</label><select id="cOs" onchange="updateSum()"><option>Windows</option><option>macOS</option><option>Linux</option></select></div>
     </div>
     <div class="field" style="margin-top:16px"><label>Engine</label><select id="cEngine"><option value="">auto (Chromium→ovobrowser)</option><option value="ovobrowser">ovobrowser (Chrome, khuyến nghị)</option><option value="camoufox">camoufox (Firefox)</option><option value="fpchromium">fpchromium</option><option value="botbrowser">botbrowser (premium)</option></select></div>
+    <div class="field"><label>Phiên bản Chrome <span class="dim" style="font-weight:400">· khoá version cho nick (tải thêm ở tab Engine)</span></label><select id="cEngineVer"><option value="">Mặc định (gói sẵn)</option>${((STATE.engines&&STATE.engines.installed)||[]).filter(e=>!e.builtin).map(e=>`<option value="${esc(e.version)}">Chrome ${esc(e.version)}</option>`).join("")}</select></div>
     <div class="field"><label>URL khởi động</label><input id="cUrl" placeholder="https://example.com"></div>
     <div class="field"><label>Proxy <a style="float:right;color:var(--primary);font-weight:700;cursor:pointer" onclick="useLibPrx()">Chọn từ thư viện</a></label>
       <input id="cProxy" placeholder="host:port:user:pass  (tự nhận http/socks5, trống = không proxy)"></div>
@@ -1342,14 +1368,14 @@ async function doCreate(){
   // meta chung (tags/note/màu/ghim) áp cho mọi profile tạo ra
   const tags=val("cTags").split(",").map(t=>t.trim()).filter(Boolean);
   const color=val("cColor"), note=val("cNote"), pinned=document.getElementById("cPin")?.checked;
-  const bandwidth=document.getElementById("cBandwidth")?.checked;
+  const bandwidth=document.getElementById("cBandwidth")?.checked, engineVer=val("cEngineVer");
   const hasMeta=tags.length||note||pinned||(color&&color.toLowerCase()!=="#ea1a87");
   const applyExtras=async pid=>{
     if(proxy) await j(`${API}/profiles/${pid}/proxy`,body({raw_proxy:proxy})).catch(()=>{});
     if(tz) await j(`${API}/profiles/${pid}/timezone`,body({timezone:tz})).catch(()=>{});
     if(cookies.trim()) await j(`${API}/profiles/${pid}/cookies`,body({cookies})).catch(()=>{});
     if(hasMeta) await j(`${API}/profiles/${pid}/meta`,body({tags,note,color,pinned})).catch(()=>{});
-    if(bandwidth) await j(`${API}/profiles/${pid}/options`,body({save_bandwidth:true})).catch(()=>{});
+    if(bandwidth||engineVer) await j(`${API}/profiles/${pid}/options`,body({save_bandwidth:!!bandwidth,engine_version:engineVer||""})).catch(()=>{});
   };
   try{
     if(count>1){
