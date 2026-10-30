@@ -723,6 +723,21 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         db.delete_proxy(prx)
         return _ok({"id": prx, "deleted": True})
 
+    @app.post("/api/v3/proxies/<prx>/check")
+    def proxy_row_check(prx: str):
+        """Kiểm tra live 1 proxy trong bảng + LƯU kết quả vào meta (để dòng cập nhật, giữ qua refresh)."""
+        row = next((x for x in db.list_proxies() if x["id"] == prx), None)
+        if not row:
+            return _err("proxy không tồn tại", 404)
+        res = proxy_providers.check(row["raw_proxy"])
+        from datetime import datetime, timezone
+        meta = db.update_proxy_meta(prx, {
+            "alive": res.get("alive"), "exit_ip": res.get("exit_ip"),
+            "country": res.get("country"), "latency_ms": res.get("latency_ms"),
+            "scheme": res.get("scheme"), "error": res.get("error"),
+            "checked_at": datetime.now(timezone.utc).isoformat()})
+        return _ok({**res, "id": prx, "meta": meta})
+
     @app.post("/api/v3/profiles/<pid>/proxy/from/<prx>")
     def assign_proxy_from_table(pid: str, prx: str):
         p = db.get_profile(pid)

@@ -288,6 +288,16 @@ class Database:
         self.conn.execute("DELETE FROM proxies WHERE id=?", (prx,))
         self.conn.commit()
 
+    def update_proxy_meta(self, prx: str, meta: dict) -> dict:
+        """Merge meta (kết quả kiểm tra: alive/exit_ip/country/latency_ms/checked_at) vào proxy -> persist."""
+        row = self.conn.execute("SELECT meta_data FROM proxies WHERE id=?", (prx,)).fetchone()
+        base = json.loads((row["meta_data"] if row else None) or "{}")
+        base.update(meta)
+        self.conn.execute("UPDATE proxies SET meta_data=?, updated_at=? WHERE id=?",
+                          (json.dumps(base, ensure_ascii=False), _now(), prx))
+        self.conn.commit()
+        return base
+
     # --- groups ---
     def create_group(self, name: str) -> str:
         gid, now = _uuid(), _now()

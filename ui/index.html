@@ -618,29 +618,40 @@ function viewProfiles(){
 
 /* ----- Proxy ----- */
 function viewProxy(){
-  const list=STATE.proxies;
+  STATE.prxSel=STATE.prxSel||new Set();
+  const list=STATE.proxies, sel=STATE.prxSel;
+  const allSel=list.length>0 && list.every(x=>sel.has(x.id));
   const rows=list.length? list.map(x=>{
-    const m=x.meta||{}; const st=m.alive===false?'<span class="dim"><span class="dot err"></span>Không hoạt động</span>':m.alive?'<span style="color:var(--ok)"><span class="dot ok"></span>Hoạt động</span>':'<span class="dim"><span class="dot off"></span>Chưa kiểm tra</span>';
+    const m=x.meta||{};
+    const st = x._checking ? '<span class="dim"><span class="spin"></span>Đang kiểm tra…</span>'
+      : m.alive===false ? `<span style="color:var(--err)"><span class="dot err"></span>Chết${m.checked_at?' · '+fmtAgo(m.checked_at):''}</span>`
+      : m.alive ? `<span style="color:var(--ok)"><span class="dot ok"></span>Sống${m.checked_at?' · '+fmtAgo(m.checked_at):''}</span>`
+      : '<span class="dim"><span class="dot off"></span>Chưa kiểm tra</span>';
     return `<tr>
-      <td><input type="checkbox" class="chk"></td>
+      <td><input type="checkbox" class="chk" ${sel.has(x.id)?'checked':''} onchange="togglePrxSel('${x.id}',this.checked)"></td>
       <td class="mono">${esc(x.raw_proxy)}</td>
       <td class="dim">${esc(m.country||m.exit_ip||'—')}</td>
       <td class="dim">${esc((x.raw_proxy.split('://')[0]||'http').toUpperCase())}</td>
       <td class="dim">${m.latency_ms!=null?m.latency_ms+' ms':'—'}</td>
       <td>${st}</td>
       <td><div class="rowact">
-        <button class="btn sm ghost-pink" onclick="checkPrx('${x.id}')">${svg(I.play)}Kiểm tra</button>
+        <button class="btn sm ghost-pink" ${x._checking?'disabled':''} onclick="checkPrx('${x.id}')">${svg(I.play)}Kiểm tra</button>
         <button class="btn sm" onclick="delPrx('${x.id}')">🗑</button></div></td></tr>`;}).join("")
     : `<tr><td colspan="7"><div class="empty"><h3>Chưa có proxy</h3><p>Bấm <b>Thêm proxy</b>. Hỗ trợ dán trần — tự nhận http/socks5.</p></div></td></tr>`;
   return `<div class="phead"><h1>Quản lý <em>Proxy</em></h1><p>Thêm, kiểm tra và quản lý danh sách proxy để dùng cho profile.</p></div>
     <div class="toolbar">
       <button class="btn pri" onclick="addPrx()">${svg(I.plus)}Thêm proxy</button>
       <button class="btn" onclick="addPrx()">${svg(I.up)}Import hàng loạt</button>
+      ${list.length?`<button class="btn ghost-pink" onclick="checkAllPrx()">${svg(I.play)}Kiểm tra tất cả</button>`:''}
       <div class="grow"></div>
       <div class="search" style="width:260px">${svg(I.search)}<input placeholder="Tìm proxy..."></div>
     </div>
+    ${sel.size?`<div class="toolbar" style="margin-top:-6px;align-items:center">
+      <span class="dim"><b style="color:var(--primary)">${sel.size}</b> đã chọn</span>
+      <button class="btn ghost-pink" onclick="checkSelectedPrx()">${svg(I.play)}Kiểm tra đã chọn</button>
+      <button class="btn" onclick="togglePrxAll(false)">Bỏ chọn</button></div>`:''}
     <div class="card"><table>
-      <thead><tr><th style="width:36px"></th><th>IP:Port</th><th>Quốc gia / Exit IP</th><th>Loại</th><th>Độ trễ</th><th>Trạng thái</th><th style="text-align:right">Thao tác</th></tr></thead>
+      <thead><tr><th style="width:36px"><input type="checkbox" class="chk" ${allSel?'checked':''} onchange="togglePrxAll(this.checked)"></th><th>IP:Port</th><th>Quốc gia / Exit IP</th><th>Loại</th><th>Độ trễ</th><th>Trạng thái</th><th style="text-align:right">Thao tác</th></tr></thead>
       <tbody>${rows}</tbody></table>
       <div class="pager2"><div class="grow"></div><span>Tổng số <b>${list.length}</b> proxy</span></div></div>`;
 }
@@ -1333,7 +1344,28 @@ async function savePrxBulk(){
   show(false);toast(`Đã thêm ${ok}/${lines.length} proxy`,"ok");refresh();
 }
 async function delPrx(id){try{await j(`${API}/proxies/${id}`,{method:"DELETE"});toast("Đã xoá");refresh();}catch(e){toast(e.message,"err");}}
-async function checkPrx(id){const x=STATE.proxies.find(p=>p.id===id);if(!x)return;toast("Đang kiểm tra...","");try{const d=await j(`${API}/proxy/check`,body({raw_proxy:x.raw_proxy}));toast(d.alive?`● Sống ${d.exit_ip||''} ${d.country||''} · ${d.latency_ms}ms`:`● Chết: ${d.error||''}`,d.alive?"ok":"err");}catch(e){toast(e.message,"err");}}
+async function checkPrx(id){const x=STATE.proxies.find(p=>p.id===id);if(!x)return;
+  x._checking=true;if(STATE.view==='proxy')render();
+  try{const d=await j(`${API}/proxies/${id}/check`,body({}));x.meta=d.meta;x._checking=false;if(STATE.view==='proxy')render();
+    toast(d.alive?`● Sống ${d.exit_ip||''} ${d.country||''} · ${d.latency_ms}ms`:`● Chết: ${d.error||''}`,d.alive?"ok":"err");}
+  catch(e){x._checking=false;if(STATE.view==='proxy')render();toast(e.message,"err");}}
+/* ----- kiểm tra proxy hàng loạt (song song tối đa 5, cập nhật dần từng dòng) ----- */
+async function checkProxies(ids){
+  ids=[...new Set(ids)].filter(Boolean);
+  if(!ids.length)return toast("Chọn proxy để kiểm tra","");
+  ids.forEach(id=>{const x=STATE.proxies.find(p=>p.id===id);if(x)x._checking=true;});
+  if(STATE.view==='proxy')render();
+  let ok=0,fail=0; const queue=[...ids];
+  async function worker(){while(queue.length){const id=queue.shift();const x=STATE.proxies.find(p=>p.id===id);
+    try{const d=await j(`${API}/proxies/${id}/check`,body({}));if(x){x.meta=d.meta;x._checking=false;}d.alive?ok++:fail++;}
+    catch(e){if(x)x._checking=false;fail++;}
+    if(STATE.view==='proxy')render();}}
+  await Promise.all(Array.from({length:Math.min(5,ids.length)},worker));
+  toast(`Kiểm tra xong: ${ok} sống · ${fail} chết/lỗi`, fail&&!ok?"err":"ok");}
+function checkSelectedPrx(){return checkProxies([...(STATE.prxSel||new Set())]);}
+function checkAllPrx(){return checkProxies(STATE.proxies.map(p=>p.id));}
+function togglePrxSel(id,on){STATE.prxSel=STATE.prxSel||new Set();on?STATE.prxSel.add(id):STATE.prxSel.delete(id);if(STATE.view==='proxy')render();}
+function togglePrxAll(on){STATE.prxSel=STATE.prxSel||new Set();if(on)STATE.proxies.forEach(p=>STATE.prxSel.add(p.id));else STATE.prxSel.clear();if(STATE.view==='proxy')render();}
 
 /* ================= CREATE / EDIT MODAL ================= */
 let CT={tab:"nhanh",proxyChk:""};
