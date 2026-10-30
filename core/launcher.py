@@ -17,6 +17,7 @@ from typing import Any, Iterator
 
 from .db import Database, Profile
 from .fingerprint import to_camoufox, parse_gpm
+from .proxy_relay import maybe_relay
 
 
 def _profile_dir(profiles_root: str | Path, profile: Profile) -> str:
@@ -58,32 +59,84 @@ def open_profile(db: Database, profile: Profile, profiles_root: str | Path, *,
         yield browser
 
 
-# --- serve mode: 1 ws endpoint cho mỗi profile (như remote debugging address của GPM) ---
+# --- serve mode: mở camoufox giữ profile (như StartProfile của GPM) ---
 
-_WS_RE = re.compile(rb"(ws://[^\s'\"]+)")
+# Chạy trong subprocess: mở Camoufox IN-PROCESS persistent (giữ cookies/login), in READY rồi chờ
+# tới khi parent đóng stdin -> thoát with-block -> Firefox đóng sạch. Nhận kwargs qua argv[1] (json).
+_CAMO_CODE = (
+    "import json,sys\n"
+    "from camoufox.sync_api import Camoufox\n"
+    "kw=json.loads(sys.argv[1])\n"
+    "try:\n"
+    "    cam=Camoufox(**kw)\n"
+    "except ValueError as e:\n"
+    "    if 'webgl' in str(e).lower() and 'webgl_config' in kw:\n"
+    "        kw.pop('webgl_config'); cam=Camoufox(**kw)\n"
+    "    else: raise\n"
+    "with cam as b:\n"
+    "    print('CAMOUFOX_READY', flush=True)\n"
+    "    try: sys.stdin.read()\n"
+    "    except Exception: pass\n"
+)
+
+
+class _CamoufoxHandle:
+    """Giữ subprocess camoufox + relay proxy (nếu có); terminate() đóng sạch cả hai (interface như Popen)."""
+    def __init__(self, proc: subprocess.Popen, relay=None):
+        self.proc, self.relay = proc, relay
+
+    def terminate(self) -> None:
+        try:
+            if self.proc.stdin:
+                self.proc.stdin.close()      # tín hiệu đóng sạch: child thoát with-block -> Firefox tắt gọn
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            self.proc.wait(timeout=8)
+        except Exception:  # noqa: BLE001
+            try:
+                self.proc.terminate()
+            except Exception:  # noqa: BLE001
+                pass
+        if self.relay:
+            try:
+                self.relay.terminate()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 def serve_profile(profile: Profile, profiles_root: str | Path, *,
-                  headless: bool = True, port: int = 0) -> tuple[subprocess.Popen, str]:
-    """Spawn camoufox launch_server ở tiến trình riêng, trả (proc, ws_endpoint).
+                  headless: bool = True, port: int = 0) -> tuple[_CamoufoxHandle, str]:
+    """Mở camoufox giữ profile, trả (handle, endpoint-sentinel).
 
-    Dùng launch_server của camoufox (phát 1 Playwright BrowserServer ws endpoint).
+    camoufox.launch_server KHÔNG serve được persistent context qua ws (giới hạn Playwright) -> mở
+    IN-PROCESS persistent trong subprocess. Firefox không nhận proxy có auth/socks5-auth -> proxy auth
+    đi qua relay cục bộ không-auth (như các engine Chromium). Lỗi thật của camoufox được nêu rõ.
     """
     kwargs, _ = build_launch_kwargs(profile, profiles_root, headless=headless)
-    kwargs["port"] = port
-    code = (
-        "import json,sys;from camoufox.server import launch_server;"
-        f"launch_server(**json.loads({json.dumps(json.dumps(kwargs))}))"
-    )
-    proc = subprocess.Popen([sys.executable, "-c", code],
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    relay = None
+    if kwargs.get("proxy"):
+        kwargs["proxy"], relay = maybe_relay(kwargs["proxy"])   # auth -> relay http cục bộ; Firefox dùng được
+    proc = subprocess.Popen([sys.executable, "-u", "-c", _CAMO_CODE, json.dumps(kwargs)],
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out: list[str] = []
     assert proc.stdout is not None
-    for _ in range(200):                       # đợi ws endpoint in ra (tối đa ~ vài giây/dòng)
+    for _ in range(400):                       # camoufox khởi động chậm (~5-20s) + in vài dòng patch fingerprint
         line = proc.stdout.readline()
         if not line:
             break
-        m = _WS_RE.search(line)
-        if m:
-            return proc, m.group(1).decode()
-    proc.terminate()
-    raise RuntimeError("Không lấy được ws endpoint từ camoufox launch_server")
+        s = line.decode(errors="replace").rstrip()
+        out.append(s)
+        if "CAMOUFOX_READY" in s:
+            return _CamoufoxHandle(proc, relay), f"camoufox-local://{profile.id}"
+    try:
+        proc.terminate()
+    except Exception:  # noqa: BLE001
+        pass
+    if relay:
+        try:
+            relay.terminate()
+        except Exception:  # noqa: BLE001
+            pass
+    tail = "\n".join(out[-15:]) or "(không có output)"
+    raise RuntimeError("camoufox mở thất bại:\n" + tail)

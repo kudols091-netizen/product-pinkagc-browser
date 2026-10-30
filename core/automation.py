@@ -194,8 +194,13 @@ def _elem_exists(page: Any, selector: str, timeout_ms: int) -> bool:
 
 def _connect(pw: Any, engine: str, ws_endpoint: str) -> Any:
     """camoufox phát ws endpoint Playwright-Firefox (connect); còn lại là CDP Chromium."""
-    return (pw.firefox.connect(ws_endpoint) if engine == "camoufox"
-            else pw.chromium.connect_over_cdp(ws_endpoint))
+    if engine == "camoufox":
+        if str(ws_endpoint).startswith("camoufox-local://"):
+            raise RuntimeError(
+                "Automation chưa chạy được trên camoufox (mở ở chế độ persistent in-process, không có ws "
+                "điều khiển từ xa) — dùng engine Chromium (ovobrowser/fpchromium) cho automation.")
+        return pw.firefox.connect(ws_endpoint)
+    return pw.chromium.connect_over_cdp(ws_endpoint)
 
 
 def inject_cookies(ws_endpoint: str, cookies: list[dict], *, engine: str = "chromium") -> int:
