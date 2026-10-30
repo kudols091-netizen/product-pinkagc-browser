@@ -1,0 +1,6 @@
+# Caddy reverse proxy + HTTPS tu dong (Let's Encrypt) cho Team server.
+# Doi domain neu khac. Caddy tu xin chung chi khi DNS team.pinkagc.com -> IP VM + port 80/443 mo.
+team.pinkagc.com {
+    reverse_proxy 127.0.0.1:8787
+    encode gzip
+}
