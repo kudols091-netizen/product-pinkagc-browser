@@ -1381,7 +1381,7 @@ function createTab(bro){
             ${svg('<path d="M6 9l6 6 6-6"/>','brosel-ca')}
           </button>
           <div class="brosel-menu" role="listbox">
-            ${(STATE.browsers.length?STATE.browsers:[{value:'chrome',label:'Chrome',engine:'chromium'}]).map((b,i)=>`<button type="button" role="option" data-v="${b.value}" class="${i===0?'on':''}" onclick="broPick('${b.value}','${esc(b.label)}')"><span class="brosel-ic">${broIcon(b.value)}</span><span>${esc(b.label)} <span class="dim" style="font-weight:400">· ${esc(b.engine)}</span></span></button>`).join("")}
+            ${(STATE.browsers.length?STATE.browsers:[{value:'chrome',label:'Chrome',engine:'chromium'}]).map((b,i)=>`<button type="button" role="option" data-v="${b.value}" class="${i===0?'on':''}" onclick="broPick('${b.value}','${esc(b.label)}')"><span class="brosel-ic">${broIcon(b.value)}</span><span>${esc(b.label)}</span></button>`).join("")}
           </div>
           <select id="cBrowser" onchange="updateSum()" style="display:none">${bro}</select>
         </div>
