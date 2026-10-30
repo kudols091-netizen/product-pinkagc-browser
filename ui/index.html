@@ -910,6 +910,12 @@ function renderLogRows(){const q=(val("logQ")||"").toLowerCase(),k=val("logKind"
 
 /* ----- Developer ----- */
 const API_DOCS=[
+ {g:"API GPM-compat",icon:"play",e:[
+   {m:"GET",p:"/api/v1/profiles/start/{id}",d:"GPM-compat: mở → data.remote_debugging_address (host:port) + driver_path + ws_endpoint. ?headless=1 để ẩn"},
+   {m:"GET",p:"/api/v1/profiles/close/{id}",d:"GPM-compat: đóng profile"},
+   {m:"GET",p:"/api/v1/profiles",d:"GPM-compat: danh sách"},
+   {m:"GET",p:"/api/v1/status",d:"GPM-compat: health + đang chạy"},
+ ]},
  {g:"Profiles",icon:"user",e:[
    {m:"GET",p:"/profiles",d:"Danh sách profile (tóm tắt)"},
    {m:"GET",p:"/profiles/{id}",d:"Full profile (fingerprint_data + dynamic_data)"},
@@ -981,7 +987,13 @@ function viewDeveloper(){
        <button class="btn sm" onclick="cp('${location.origin}/api/v3',this)">${svg(I.copy)} Copy</button></div>
      <p class="dim" style="font-size:13px;margin:8px 0 0">Chỉ bind <code>127.0.0.1</code> (cục bộ, không auth). Mọi response dạng <code>{success, data, message?}</code>. Ví dụ:</p>
      <pre class="mono" style="background:#1b1c26;color:#e9eaf0;border-radius:10px;padding:12px;margin:10px 0 0;overflow:auto;font-size:12.5px">curl ${location.origin}/api/v3/profiles
-curl -X POST ${location.origin}/api/v3/profiles/create -H "Content-Type: application/json" -d '{"browser":"Chrome"}'</pre></div>
+curl -X POST ${location.origin}/api/v3/profiles/create -H "Content-Type: application/json" -d '{"browser":"Chrome"}'</pre>
+     <p class="dim" style="font-size:13px;margin:12px 0 0"><b style="color:var(--text)">Tương thích GPM/AdsPower</b> — mở profile qua <code>/api/v1/profiles/start/{id}</code> rồi lái bằng Selenium/Puppeteer (script GPM chạy sẵn, chỉ đổi base URL sang <code>${location.origin}</code>):</p>
+     <pre class="mono" style="background:#1b1c26;color:#e9eaf0;border-radius:10px;padding:12px;margin:8px 0 0;overflow:auto;font-size:12.5px">r = requests.get("${location.origin}/api/v1/profiles/start/" + pid).json()
+addr = r["data"]["remote_debugging_address"]      # 127.0.0.1:PORT
+opts = webdriver.ChromeOptions(); opts.add_experimental_option("debuggerAddress", addr)
+driver = webdriver.Chrome(options=opts)           # lái profile như thường
+# Puppeteer: puppeteer.connect({ browserWSEndpoint: r.data.ws_endpoint })</pre></div>
    <div class="split" style="grid-template-columns:230px 1fr;align-items:start">
      <div class="card" style="padding:8px">
        ${API_DOCS.map((gr,i)=>`<button class="devnav ${(STATE.devCat||0)===i?'on':''}" onclick="STATE.devCat=${i};render()">${svg(I[gr.icon])} ${esc(gr.g)}<span class="n">${gr.e.length}</span></button>`).join("")}

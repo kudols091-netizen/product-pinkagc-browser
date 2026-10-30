@@ -252,6 +252,53 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
     def stop_profile(pid: str):
         return _ok(_stop_one(pid))
 
+    # ---- Local API TƯƠNG THÍCH GPM (/api/v1) — để Selenium/Puppeteer & script GPM/AdsPower dùng sẵn.
+    # GPM trả {success, data:{remote_debugging_address:"127.0.0.1:PORT", driver_path, ...}}. Dùng GET.
+    def _debug_addr(ep: str) -> str:
+        from urllib.parse import urlparse
+        return urlparse(ep).netloc or ep        # ws://127.0.0.1:PORT/devtools/... -> 127.0.0.1:PORT
+
+    def _driver_path() -> str:
+        import glob
+        import os
+        bin_env = os.environ.get("OVOBROWSER_BIN") or os.environ.get("FPCHROMIUM_BIN") or ""
+        if bin_env:
+            hits = glob.glob(str(Path(bin_env).parent / "chromedriver*.exe"))
+            if hits:
+                return hits[0]
+        return ""
+
+    def _gpm_ok(data: dict):
+        return jsonify({"success": True, "data": data})
+
+    def _gpm_err(msg: str, code: int = 400):
+        return jsonify({"success": False, "message": msg}), code
+
+    @app.get("/api/v1/status")
+    def gpm_status():
+        return _gpm_ok({"app": brand.APP_NAME, "version": brand.VERSION, "running": list(running)})
+
+    @app.get("/api/v1/profiles")
+    def gpm_profiles():
+        rows = [{"id": p.id, "name": p.name, "group": p.group_id,
+                 "status": "running" if p.id in running else "stopped"} for p in db.list_profiles()]
+        return _gpm_ok({"profiles": rows, "total": len(rows)})
+
+    @app.route("/api/v1/profiles/start/<pid>", methods=["GET", "POST"])
+    def gpm_start(pid: str):
+        hl = request.args.get("headless") in ("1", "true", "yes")
+        r = _start_one(pid, {"engine": request.args.get("engine"), "headless": hl})
+        if r.get("error"):
+            return _gpm_err(r["error"], 404 if "not found" in r["error"] else 500)
+        return _gpm_ok({"profile_id": pid, "id": pid, "ws_endpoint": r["ws_endpoint"],
+                        "remote_debugging_address": _debug_addr(r["ws_endpoint"]),
+                        "driver_path": _driver_path(), "engine": r.get("engine", "")})
+
+    @app.route("/api/v1/profiles/close/<pid>", methods=["GET", "POST"])
+    def gpm_close(pid: str):
+        _stop_one(pid)
+        return _gpm_ok({"profile_id": pid, "id": pid})
+
     @app.delete("/api/v3/profiles/<pid>")
     def delete_profile(pid: str):
         _stop_one(pid)
