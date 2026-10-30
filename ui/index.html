@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PinkAgc Browser — Profile Manager</title>
 <style>
+  /* Roboto thật, bundle local (variable, có subset tiếng Việt) — không phụ thuộc mạng */
+  @font-face{font-family:Roboto;font-style:normal;font-weight:100 900;font-display:swap;
+    src:url('fonts/roboto-vietnamese.woff2') format('woff2');
+    unicode-range:U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;}
+  @font-face{font-family:Roboto;font-style:normal;font-weight:100 900;font-display:swap;
+    src:url('fonts/roboto-latin-ext.woff2') format('woff2');
+    unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF;}
+  @font-face{font-family:Roboto;font-style:normal;font-weight:100 900;font-display:swap;
+    src:url('fonts/roboto-latin.woff2') format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
   :root{
     --sidebar:#1B1C26; --sidebar-hover:#262734; --sidebar-line:#2e3040;
     --primary:#EA1A87; --primary-dark:#C71574; --primary-soft:#FDE4F1;
@@ -19,7 +29,7 @@
   *{box-sizing:border-box}
   html,body{height:100%}
   body{margin:0;background:var(--page);color:var(--ink);
-    font:14px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+    font:14px/1.5 Roboto,"Segoe UI",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
   a{color:inherit}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-thumb{background:#e3cede;border-radius:8px;border:2px solid transparent;background-clip:content-box}
@@ -30,17 +40,17 @@
   .brand{display:flex;align-items:center;gap:11px;padding:20px 20px 14px}
   .brand img{width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
   .brand .wm{line-height:1}
-  .brand .wm b{font-size:23px;font-weight:800;color:var(--primary);letter-spacing:.2px}
+  .brand .wm b{font-size:23px;font-weight:700;color:var(--primary);letter-spacing:.2px}
   .brand .wm span{display:block;font-size:13px;color:#b9bac6;margin-top:2px;font-weight:600}
   .nav{flex:1;overflow-y:auto;padding:6px 12px 16px}
   .nav::-webkit-scrollbar-thumb{background:#3a3c4e}
   .nav .sep{height:1px;background:var(--sidebar-line);margin:12px 10px}
   .nav button{display:flex;align-items:center;gap:13px;width:100%;border:0;background:none;color:#c6c7d2;
-    padding:11px 14px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;margin:2px 0;text-align:left;transition:.12s}
+    padding:11px 14px;border-radius:10px;font:inherit;font-weight:500;cursor:pointer;margin:2px 0;text-align:left;transition:.12s}
   .nav button:hover{background:var(--sidebar-hover);color:#fff}
   .nav button.on{background:var(--primary);color:#fff;box-shadow:0 6px 16px rgba(234,26,135,.35)}
   .nav button svg{width:20px;height:20px;flex:none;stroke-width:2}
-  .nav .badge{margin-left:auto;background:var(--primary);color:#fff;font-size:10px;font-weight:800;
+  .nav .badge{margin-left:auto;background:var(--primary);color:#fff;font-size:10px;font-weight:700;
     padding:2px 7px;border-radius:20px;letter-spacing:.3px}
   .nav button.on .badge{background:#fff;color:var(--primary)}
 
@@ -56,17 +66,17 @@
 
   /* ---------- Page header ---------- */
   .phead{margin-bottom:20px}
-  .phead h1{font-size:30px;font-weight:800;margin:0;letter-spacing:-.3px}
+  .phead h1{font-size:30px;font-weight:700;margin:0;letter-spacing:-.3px}
   .phead h1 em{font-style:normal;color:var(--primary)}
   .phead p{margin:6px 0 0;color:var(--mut);font-size:14.5px}
 
   /* ---------- Buttons / inputs ---------- */
   button{font:inherit}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;padding:9px 16px;min-height:var(--btn-h);font-weight:700;
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;padding:9px 16px;min-height:var(--btn-h);font-weight:500;
     cursor:pointer;border:1px solid var(--line2);background:#fff;color:var(--ink);transition:.12s;white-space:nowrap}
   .btn:hover{background:#faf2f7;border-color:var(--line2)}
   .btn svg{width:17px;height:17px;stroke-width:2.2}
-  .btn.pri{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 6px 16px rgba(234,26,135,.28)}
+  .btn.pri{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600;box-shadow:0 6px 16px rgba(234,26,135,.28)}
   .btn.pri:hover{background:var(--primary-dark);border-color:var(--primary-dark)}
   .btn.ghost-pink{border-color:var(--primary);color:var(--primary);background:#fff}
   .btn.ghost-pink:hover{background:var(--primary-soft)}
@@ -76,7 +86,7 @@
     padding:10px 12px;font:inherit;color:var(--ink);outline:none;transition:.12s}
   input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(234,26,135,.12)}
   input::placeholder{color:var(--mut2)}
-  label{display:block;font-weight:600;font-size:13px;margin:0 0 6px;color:#5a5260}
+  label{display:block;font-weight:500;font-size:13px;margin:0 0 6px;color:#5a5260}
   .field{margin-bottom:16px}
   .search{position:relative}
   .search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--mut2)}
@@ -97,7 +107,7 @@
   .segrow>span{font-weight:600;color:#5a5260}
   .ep{display:flex;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
   .ep:last-child{border-bottom:0}
-  .verb{font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;min-width:52px;text-align:center;flex:none}
+  .verb{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;min-width:52px;text-align:center;flex:none}
   .verb.GET{background:#e3f6e9;color:#1a8f5a} .verb.POST{background:#eaf1fe;color:#2563eb}
   .verb.DELETE{background:#fdeaea;color:#d23} .verb.PUT{background:#fef3e2;color:#c77}
   .ep .p{font-family:ui-monospace,monospace;font-size:13px;font-weight:600}
@@ -113,7 +123,7 @@
   /* ---------- Table ---------- */
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:visible}
   table{width:100%;border-collapse:collapse}
-  thead th{text-align:left;font-size:12px;font-weight:700;color:var(--mut);text-transform:none;
+  thead th{text-align:left;font-size:12px;font-weight:500;color:var(--mut);text-transform:none;
     padding:14px 16px;border-bottom:1px solid var(--line);background:#fffafd;white-space:nowrap;
     position:sticky;top:0;z-index:5}
   .card>table thead th:first-child{border-top-left-radius:var(--r)}
@@ -168,16 +178,16 @@
   .devnav svg{width:16px;height:16px;flex:none;stroke-width:2}
   .devnav>.n{margin-left:auto;font-size:11px;color:var(--mut2);font-weight:700}
   /* step số (MCP) */
-  .stepn{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--primary);color:#fff;font-size:13px;font-weight:800;margin-right:9px;flex:none}
+  .stepn{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--primary);color:#fff;font-size:13px;font-weight:700;margin-right:9px;flex:none}
   .steph{display:flex;align-items:center;margin:0 0 4px}
   /* home stat */
-  .statn{font-family:inherit;font-size:30px;font-weight:800;margin-top:6px;color:var(--primary);line-height:1}
+  .statn{font-family:inherit;font-size:30px;font-weight:700;margin-top:6px;color:var(--primary);line-height:1}
   .statl{font-size:12px;color:var(--mut);font-weight:600}
   /* trình dựng automation */
   .austep{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
   .austep>select{width:auto;min-width:140px}
   .austep>input{flex:1;min-width:110px}
-  .auno{width:22px;height:22px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-size:12px;font-weight:800;flex:none}
+  .auno{width:22px;height:22px;border-radius:50%;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
   .austep .gp{margin-left:auto;display:flex;gap:4px}
   .austep .gp .btn{padding:6px 9px}
 
@@ -209,13 +219,13 @@
   .mhead{display:flex;align-items:center;gap:12px;padding:20px 24px;border-bottom:1px solid var(--line)}
   .mhead .ic{width:40px;height:40px;border-radius:11px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center}
   .mhead .ic svg{width:22px;height:22px;stroke-width:2.2}
-  .mhead h2{font-size:21px;margin:0;font-weight:800;flex:1}
+  .mhead h2{font-size:21px;margin:0;font-weight:700;flex:1}
   .mhead .x{width:36px;height:36px;border:0;background:none;color:var(--mut);border-radius:9px;cursor:pointer;display:grid;place-items:center}
   .mhead .x:hover{background:#f6eef3;color:var(--ink)}
   .mbody{padding:22px 24px}
   .createtop{display:grid;grid-template-columns:1fr 1fr auto auto;gap:12px;margin-bottom:6px}
   .tabs{display:flex;gap:26px;border-bottom:1px solid var(--line);margin:18px 0 22px}
-  .tabs button{border:0;background:none;padding:0 0 12px;font-weight:700;color:var(--mut);cursor:pointer;position:relative;font-size:15px}
+  .tabs button{border:0;background:none;padding:0 0 12px;font-weight:500;color:var(--mut);cursor:pointer;position:relative;font-size:15px}
   .tabs button.on{color:var(--primary)}
   .tabs button.on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:var(--primary);border-radius:3px}
   .split{display:grid;grid-template-columns:1fr 330px;gap:26px}
@@ -1278,7 +1288,7 @@ function openCreate(){CT={tab:"nhanh",proxyChk:""};renderCreate();show(true);
 function show(on){document.getElementById("overlay").classList.toggle("show",on);if(!on)document.getElementById("overlay").innerHTML="";}
 function renderCreate(){
   const bro=STATE.browsers.length?STATE.browsers.map(b=>`<option value="${b.value}">${esc(b.label)} (${b.engine})</option>`).join(""):'<option value="Chrome">Chrome</option>';
-  const tabs=[["nhanh","Thao tác nhanh"],["ketnoi","Kết nối"],["hardware","Hardware"],["software","Software"],["cookies","Cookies"]];
+  const tabs=[["nhanh","Thao tác nhanh"],["ketnoi","Kết nối"],["hardware","Phần cứng"],["software","Phần mềm"],["cookies","Cookies"]];
   document.getElementById("overlay").innerHTML=`<div class="modal lg">
    <div class="mhead"><div class="ic">${svg(I.plus)}</div><h2>Tạo profile</h2><button class="x" onclick="show(false)">✕</button></div>
    <div class="mbody">
@@ -1331,8 +1341,8 @@ function createTab(bro){
     <div class="field"><label>Micro giả <span class="dim" style="font-weight:400">· audio <code>.wav</code> feed vào mic (trống = tắt)</span></label>
       <div class="inline" style="gap:8px"><input id="cFakeMic" placeholder="C:\\audio\\voice.wav" style="flex:1"><button type="button" class="btn" onclick="pickFile('cFakeMic','Audio|*.wav;*.mp3;*.m4a;*.aac|All|*.*','wav')">Browse</button></div></div>`)
   + P("ketnoi",`
-    <div class="field"><label>WebRTC</label><select><option>Base on IP (khuyến nghị)</option><option>Disable</option><option>Real</option></select></div>
-    <div class="field"><label>Geolocation</label><select><option>Auto theo IP</option><option>Prompt</option><option>Block</option></select></div>
+    <div class="field"><label>WebRTC</label><select><option>Theo IP (khuyến nghị)</option><option>Tắt</option><option>Thật</option></select></div>
+    <div class="field"><label>Vị trí địa lý</label><select><option>Tự động theo IP</option><option>Hỏi khi truy cập</option><option>Chặn</option></select></div>
     <div class="field"><label>Timezone</label><input id="cTz" list="tzl" placeholder="Auto theo IP proxy (để trống)"><datalist id="tzl"><option value="America/New_York"><option value="America/Chicago"><option value="America/Los_Angeles"><option value="Europe/London"><option value="Asia/Ho_Chi_Minh"><option value="Asia/Bangkok"></datalist></div>
     <p class="dim" style="font-size:13px">WebRTC/Geo mặc định đã an toàn. Timezone auto khớp IP exit của proxy (chống rò giờ).</p>`)
   + P("hardware",`
@@ -1360,8 +1370,8 @@ async function pickFile(inputId,filter,convertTo){
     catch(e){return toast("Convert lỗi: "+e.message,"err");}}
   const el=document.getElementById(inputId);if(el)el.value=path;if(!convertTo||ext===convertTo)toast("Đã chọn file","ok");}
 function updateSum(){const s=document.getElementById("cSum");if(!s)return;
-  const b=val("cBrowser","Chrome"),os=val("cOs","Windows"),pr=val("cProxy")?'Có':'None',tz=val("cTz")||'Auto';
-  s.innerHTML=[["Browser",b],["OS",os],["User agent","Auto"],["Proxy",pr],["Language","Auto"],["Timezone",tz],["WebRTC","Base on IP"],["GPU","Pool thật (coherent)"],["Screen","Auto"]].map(r=>`<div class="row"><span>${r[0]}</span><span>${esc(r[1])}</span></div>`).join("");}
+  const b=val("cBrowser","Chrome"),os=val("cOs","Windows"),pr=val("cProxy")?'Có':'Chưa thiết lập',tz=val("cTz")||'Tự động';
+  s.innerHTML=[["Trình duyệt",b],["Hệ điều hành",os],["User-Agent","Tự động"],["Proxy",pr],["Ngôn ngữ","Tự động"],["Múi giờ",tz],["WebRTC","Theo IP"],["GPU","Pool thật (coherent)"],["Màn hình","Tự động"]].map(r=>`<div class="row"><span>${r[0]}</span><span>${esc(r[1])}</span></div>`).join("");}
 function randPreview(){toast("Thông số sẽ random coherent khi tạo","");}
 function useLibPrx(){if(!STATE.proxies.length)return toast("Thư viện proxy trống","");const p=STATE.proxies[0];const e=document.getElementById("cProxy");if(e){e.value=p.raw_proxy;updateSum();}}
 async function chkCreateProxy(){const raw=val("cProxy");if(!raw)return toast("Nhập proxy","");document.getElementById("cProxySt").textContent="Đang kiểm tra...";try{const d=await j(`${API}/proxy/check`,body({raw_proxy:raw}));CT.proxyChk=d.alive?`● Sống ${d.exit_ip||''} ${d.country||''} ${d.latency_ms}ms`:`● Chết: ${d.error||''}`;document.getElementById("cProxySt").textContent=CT.proxyChk;}catch(e){document.getElementById("cProxySt").textContent=e.message;}}
@@ -1425,7 +1435,7 @@ async function editP(id){
   const mode=(cur,ids)=>`<select id="${ids}">${["Noise","Real","Masked"].map(m=>`<option ${(''+(cur||'Noise')).toLowerCase()===m.toLowerCase()?'selected':''}>${m}</option>`).join("")}</select>`;
   const gi=GPUS.findIndex(g=>g.r===wm.renderer);
   const scrv=(scr.width>0)?`${scr.width}x${scr.height}`:"real";
-  const etabs=[["info","Thông tin"],["ketnoi","Kết nối"],["hardware","Hardware"],["software","Software"],["cookies","Cookies"]];
+  const etabs=[["info","Thông tin"],["ketnoi","Kết nối"],["hardware","Phần cứng"],["software","Phần mềm"],["cookies","Cookies"]];
   const EP_=(id,html)=>`<div class="tabpanel" data-tp="${id}" style="display:${id==='info'?'block':'none'}">${html}</div>`;
   document.getElementById("overlay").innerHTML=`<div class="modal lg">
    <div class="mhead"><div class="ic">✎</div><h2>Sửa profile: ${esc(full.name)}</h2><button class="x" onclick="show(false)">✕</button></div>
