@@ -56,14 +56,14 @@
   .nav button.on .badge{background:#fff;color:var(--primary)}
 
   /* ---------- Main ---------- */
-  .main{display:flex;flex-direction:column;min-width:0;background:var(--page)}
+  .main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--page)}
   .topbar{display:flex;align-items:center;gap:6px;justify-content:flex-end;padding:14px 26px;border-bottom:1px solid var(--line)}
   .iconbtn{width:38px;height:38px;border-radius:10px;border:0;background:none;color:#6b6472;cursor:pointer;
     display:grid;place-items:center;transition:.12s}
   .iconbtn:hover{background:#fbe8f3;color:var(--primary)}
   .iconbtn svg{width:20px;height:20px;stroke-width:2}
   .vline{width:1px;height:22px;background:var(--line2);margin:0 6px}
-  .content{flex:1;overflow-y:auto;padding:26px 30px 40px}
+  .content{flex:1;min-height:0;overflow:auto;padding:26px 30px 40px}   /* cuộn dọc (nhiều profile) + ngang (bảng rộng); sticky header vẫn chạy */
 
   /* ---------- Page header ---------- */
   .phead{margin-bottom:20px}
