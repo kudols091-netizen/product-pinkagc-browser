@@ -104,6 +104,23 @@
   .seg button{border:0;background:#fff;padding:7px 18px;font-weight:600;color:var(--mut);cursor:pointer;border-right:1px solid var(--line2);transition:.1s}
   .seg button:last-child{border-right:0}
   .seg button.on{background:var(--primary-soft);color:var(--primary)}
+  /* dropdown trình duyệt có logo */
+  .brosel{position:relative}
+  .brosel-btn{display:flex;align-items:center;gap:10px;width:100%;height:42px;padding:0 12px;border:1px solid var(--line2);border-radius:10px;background:#fff;cursor:pointer;font:inherit;color:var(--ink);text-align:left;transition:.12s}
+  .brosel-btn:hover{border-color:var(--primary)}
+  .brosel-btn:focus-visible{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(234,26,135,.12)}
+  .brosel-ic{width:20px;height:20px;flex:none;display:grid;place-items:center}
+  .brosel-ic svg{width:20px;height:20px;display:block}
+  .brosel-tx{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brosel-ca{width:18px;height:18px;color:var(--mut2);flex:none;transition:.15s}
+  .brosel-menu.open ~ .brosel-btn,.brosel-btn[aria-expanded="true"] .brosel-ca{transform:rotate(180deg)}
+  .brosel-menu{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:25;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 36px rgba(60,10,50,.18);padding:6px;display:none}
+  .brosel-menu.open{display:block}
+  .brosel-menu button{display:flex;align-items:center;gap:11px;width:100%;border:0;background:none;padding:9px 10px;border-radius:8px;font:inherit;font-weight:500;color:var(--ink);cursor:pointer;text-align:left}
+  .brosel-menu button:hover{background:var(--primary-soft)}
+  .brosel-menu button.on{background:var(--primary-soft);color:var(--primary)}
+  [data-theme="dark"] .brosel-btn,[data-theme="dark"] .brosel-menu{background:#17131f}
+  [data-theme="dark"] .brosel-menu button{color:var(--ink)}
   .segrow{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
   .segrow>span{font-weight:600;color:#5a5260}
   .ep{display:flex;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
@@ -350,6 +367,24 @@ const I={
 };
 const svg=(d,cls="")=>`<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
+/* ---- logo trình duyệt (SVG màu, inline, offline) ---- */
+const BROICON={
+  chrome:`<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#fff"/><path fill="#EA4335" d="M2.6 6.8A11 11 0 0 1 21.4 6.8L12 7.2a4.8 4.8 0 0 0-4.3 2.6z"/><path fill="#FBBC05" d="M21.4 6.8A11 11 0 0 1 11.1 22.97l4.9-8.2a4.8 4.8 0 0 0-.7-5.97z"/><path fill="#34A853" d="M11.1 22.97A11 11 0 0 1 2.6 6.8l4.8 3.02a4.8 4.8 0 0 0 4 7.15z"/><circle cx="12" cy="12" r="4.4" fill="#fff"/><circle cx="12" cy="12" r="3.3" fill="#4285F4"/></svg>`,
+  edge:`<svg viewBox="0 0 24 24"><path fill="#1B9DE2" d="M21.8 13.4A9.8 9.8 0 0 1 5 19.2c2.8 1.3 7 .8 8.2-2.2.8-2-.8-3.9-3.4-3.9-3.6 0-5.3 2.9-4.4 6.4A9.8 9.8 0 0 1 21.8 13.4z"/><path fill="#36C752" d="M4.4 7.1A9.8 9.8 0 0 1 19.3 8.5c-2.2-2.3-6.6-2.6-8.8-.3-1.6 1.6-1.1 4.5 2 4.8-5.3.2-8.4-2.8-8.1-5.9z"/></svg>`,
+  opera:`<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#FF1B2D"/><ellipse cx="12" cy="12" rx="3.8" ry="6.6" fill="#fff"/></svg>`,
+  brave:`<svg viewBox="0 0 24 24"><path fill="#FB542B" d="M12 2 17.5 4 19 3.2 20.5 7l-1 2.3 1 2.8-8.5 7.7L3.5 15l1-2.8-1-2.3L5 3.2 6.5 4z"/><path fill="#fff" d="M12 6.5l3 1.1-1 3.4 1.6 1.4L12 15l-3.6-2.6L10 11l-1-3.4z" opacity=".92"/></svg>`,
+  firefox:`<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#FF7139"/><path fill="#FFC900" d="M19.5 7.2c.6 1.4.3 2.9-.5 3.6.5 2.6-.9 5.4-3.4 6.6-3 1.5-6.7.3-8-2.6-.8-1.8-.3-3.6.8-4.6-.4 1.3.3 2.4 1.4 2.4 1.3 0 1.9-1.1 1.3-2.6-.8-1.9.3-4 2.3-4.4-.9 1-.5 2.2.8 2.4 1.6.3 2.9-.8 2.9-2.4.9.6 1.6 1.2 2.1 1.6z" opacity=".9"/></svg>`,
+};
+const broIcon=v=>BROICON[String(v||"").toLowerCase()]||BROICON.chrome;
+function broToggle(e){e.stopPropagation();const m=document.querySelector('#cBroSel .brosel-menu');if(!m)return;
+  document.querySelectorAll('.brosel-menu.open').forEach(x=>{if(x!==m)x.classList.remove('open');});
+  m.classList.toggle('open');}
+function broPick(val,label){const sel=document.getElementById('cBrowser');if(sel){sel.value=val;sel.dispatchEvent(new Event('change'));}
+  const btn=document.querySelector('#cBroSel .brosel-btn');
+  if(btn){btn.querySelector('.brosel-ic').innerHTML=broIcon(val);btn.querySelector('.brosel-tx').textContent=label;}
+  document.querySelectorAll('#cBroSel .brosel-menu button').forEach(b=>b.classList.toggle('on',b.dataset.v===val));
+  document.querySelector('#cBroSel .brosel-menu')?.classList.remove('open');}
+
 const NAV=[
   {id:"home",label:"Trang chủ",icon:"home"},
   {id:"profiles",label:"Profiles",icon:"user"},
@@ -406,7 +441,7 @@ function toggleTheme(){applyTheme(document.documentElement.getAttribute("data-th
 function toggleKebab(btn){const menu=btn.nextElementSibling,open=menu.classList.contains('show');
   document.querySelectorAll('.kmenu.show').forEach(m=>m.classList.remove('show'));
   if(!open)menu.classList.add('show');event.stopPropagation();}
-document.addEventListener('click',()=>document.querySelectorAll('.kmenu.show').forEach(m=>m.classList.remove('show')));
+document.addEventListener('click',()=>{document.querySelectorAll('.kmenu.show').forEach(m=>m.classList.remove('show'));document.querySelectorAll('.brosel-menu.open').forEach(m=>m.classList.remove('open'));});
 
 /* ---------- sidebar ---------- */
 function renderNav(){
@@ -1338,7 +1373,19 @@ function createTab(bro){
       <div style="flex:1"><label>Quy tắc đặt tên <span class="dim" style="font-weight:400">· dùng <code>{n}</code> để đánh số</span></label><input id="cNameRule" placeholder="VD: Via US {n}" value=""></div>
     </div>
     <div class="inline" style="gap:14px">
-      <div style="flex:1"><label>Trình duyệt</label><select id="cBrowser" onchange="updateSum()">${bro}</select></div>
+      <div style="flex:1"><label>Trình duyệt</label>
+        <div class="brosel" id="cBroSel">
+          <button type="button" class="brosel-btn" onclick="broToggle(event)" aria-haspopup="listbox" aria-label="Chọn trình duyệt">
+            <span class="brosel-ic">${broIcon(STATE.browsers[0]&&STATE.browsers[0].value)}</span>
+            <span class="brosel-tx">${esc((STATE.browsers[0]&&STATE.browsers[0].label)||'Chrome')}</span>
+            ${svg('<path d="M6 9l6 6 6-6"/>','brosel-ca')}
+          </button>
+          <div class="brosel-menu" role="listbox">
+            ${(STATE.browsers.length?STATE.browsers:[{value:'chrome',label:'Chrome',engine:'chromium'}]).map((b,i)=>`<button type="button" role="option" data-v="${b.value}" class="${i===0?'on':''}" onclick="broPick('${b.value}','${esc(b.label)}')"><span class="brosel-ic">${broIcon(b.value)}</span><span>${esc(b.label)} <span class="dim" style="font-weight:400">· ${esc(b.engine)}</span></span></button>`).join("")}
+          </div>
+          <select id="cBrowser" onchange="updateSum()" style="display:none">${bro}</select>
+        </div>
+      </div>
       <div style="flex:1"><label>OS</label><select id="cOs" onchange="updateSum()"><option>Windows</option><option>macOS</option><option>Linux</option></select></div>
     </div>
     <div class="field" style="margin-top:16px"><label>Engine</label><select id="cEngine"><option value="">auto (Chromium→ovobrowser)</option><option value="ovobrowser">ovobrowser (Chrome, khuyến nghị)</option><option value="camoufox">camoufox (Firefox)</option><option value="fpchromium">fpchromium</option><option value="botbrowser">botbrowser (premium)</option></select></div>
@@ -1395,7 +1442,7 @@ async function pickFile(inputId,filter,convertTo){
     catch(e){return toast("Convert lỗi: "+e.message,"err");}}
   const el=document.getElementById(inputId);if(el)el.value=path;if(!convertTo||ext===convertTo)toast("Đã chọn file","ok");}
 function updateSum(){const s=document.getElementById("cSum");if(!s)return;
-  const b=val("cBrowser","Chrome"),os=val("cOs","Windows"),pr=val("cProxy")?'Có':'Chưa thiết lập',tz=val("cTz")||'Tự động';
+  const bval=val("cBrowser","Chrome"),b=((STATE.browsers||[]).find(x=>x.value===bval)||{}).label||bval,os=val("cOs","Windows"),pr=val("cProxy")?'Có':'Chưa thiết lập',tz=val("cTz")||'Tự động';
   s.innerHTML=[["Trình duyệt",b],["Hệ điều hành",os],["User-Agent","Tự động"],["Proxy",pr],["Ngôn ngữ","Tự động"],["Múi giờ",tz],["WebRTC","Theo IP"],["GPU","Pool thật (coherent)"],["Màn hình","Tự động"]].map(r=>`<div class="row"><span>${r[0]}</span><span>${esc(r[1])}</span></div>`).join("");}
 function randPreview(){toast("Thông số sẽ random coherent khi tạo","");}
 function useLibPrx(){if(!STATE.proxies.length)return toast("Thư viện proxy trống","");const p=STATE.proxies[0];const e=document.getElementById("cProxy");if(e){e.value=p.raw_proxy;updateSum();}}
