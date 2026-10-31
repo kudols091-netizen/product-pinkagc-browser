@@ -363,6 +363,39 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
                     pinned=b.get("pinned"), tags=b.get("tags"))
         return _ok({"id": pid})
 
+    @app.post("/api/v3/profiles/<pid>/open-folder")
+    def open_profile_folder(pid: str):
+        """Mở thư mục dữ liệu của profile trong Explorer (Windows)."""
+        p = db.get_profile(pid)
+        if not p:
+            return _err("profile not found", 404)
+        import os
+        folder = Path(profiles_root) / (p.storage_path or pid)
+        folder.mkdir(parents=True, exist_ok=True)
+        try:
+            os.startfile(str(folder))            # noqa: S606 — mở Explorer, chỉ localhost/desktop
+        except Exception as e:                   # noqa: BLE001
+            return _err(f"không mở được thư mục: {e}", 500)
+        return _ok({"id": pid, "folder": str(folder)})
+
+    @app.post("/api/v3/profiles/<pid>/shortcut")
+    def make_desktop_shortcut(pid: str):
+        """Tạo file .bat ra Desktop: double-click là mở profile (cần PinkAgc đang chạy)."""
+        p = db.get_profile(pid)
+        if not p:
+            return _err("profile not found", 404)
+        import os
+        desktop = Path(os.path.join(os.path.expanduser("~"), "Desktop"))
+        desktop.mkdir(parents=True, exist_ok=True)
+        safe = "".join(c for c in (p.name or "") if c.isalnum() or c in " -_").strip() or pid[:8]
+        bat = desktop / f"PinkAgc - {safe}.bat"
+        bat.write_text(
+            "@echo off\r\n"
+            f"curl -s -X POST \"http://127.0.0.1:19996/api/v3/profiles/start/{pid}\" >nul 2>&1\r\n"
+            "if errorlevel 1 (echo Hay mo PinkAgc Browser truoc, roi chay lai shortcut. && pause)\r\n",
+            encoding="utf-8")
+        return _ok({"id": pid, "path": str(bat)})
+
     @app.post("/api/v3/profiles/tag")
     def bulk_tag():
         """Gán/gỡ tag cho nhiều profile. {ids[], add[], remove[]}"""
