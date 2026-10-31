@@ -61,10 +61,12 @@ def open_profile(db: Database, profile: Profile, profiles_root: str | Path, *,
 
 # --- serve mode: mở camoufox giữ profile (như StartProfile của GPM) ---
 
-# Chạy trong subprocess: mở Camoufox IN-PROCESS persistent (giữ cookies/login), in READY rồi chờ
-# tới khi parent đóng stdin -> thoát with-block -> Firefox đóng sạch. Nhận kwargs qua argv[1] (json).
+# Chạy trong subprocess: mở Camoufox IN-PROCESS persistent (giữ cookies/login), in READY rồi chờ.
+# Thoát (-> Firefox đóng sạch) khi: (a) parent đóng stdin [app bấm Dừng], HOẶC
+# (b) user đóng cửa sổ Firefox tay -> persistent context hết page / đã close -> subprocess tự thoát
+# để parent poll() bắt được (nếu không, status kẹt "Đang chạy"). Nhận kwargs qua argv[1] (json).
 _CAMO_CODE = (
-    "import json,sys\n"
+    "import json,sys,time,threading\n"
     "from camoufox.sync_api import Camoufox\n"
     "kw=json.loads(sys.argv[1])\n"
     "try:\n"
@@ -75,8 +77,21 @@ _CAMO_CODE = (
     "    else: raise\n"
     "with cam as b:\n"
     "    print('CAMOUFOX_READY', flush=True)\n"
-    "    try: sys.stdin.read()\n"
+    "    stop=threading.Event()\n"
+    "    def _wait_stdin():\n"
+    "        try: sys.stdin.read()\n"       # app bấm Dừng -> parent đóng stdin -> EOF
+    "        except Exception: pass\n"
+    "        stop.set()\n"
+    "    threading.Thread(target=_wait_stdin, daemon=True).start()\n"
+    "    try: b.on('close', lambda *a: stop.set())\n"   # context đóng -> dừng
     "    except Exception: pass\n"
+    "    while not stop.is_set():\n"
+    "        try:\n"
+    "            ps=b.pages\n"              # .pages là cache (không round-trip) -> phải ping thật bên dưới
+    "            if not ps: break\n"
+    "            ps[0].evaluate('1')\n"     # round-trip: user đóng cửa sổ -> Firefox chết -> ném lỗi -> thoát
+    "        except Exception: break\n"
+    "        time.sleep(0.5)\n"
 )
 
 
