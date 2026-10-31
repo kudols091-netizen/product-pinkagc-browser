@@ -207,12 +207,11 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         if errs:
             return {"error": "script lỗi: " + "; ".join(errs)}
         rid = db.add_run(pid, p.name, script_name or "(inline)", source)
-        started = pid not in running
-        if started:
-            r = _start_one(pid, {"engine": engine, "headless": headless})
-            if r.get("error"):
-                db.finish_run(rid, False, [r["error"]])
-                return {"error": r["error"]}
+        r = _start_one(pid, {"engine": engine, "headless": headless})   # idempotent: đang mở -> already_running
+        if r.get("error"):
+            db.finish_run(rid, False, [r["error"]])
+            return {"error": r["error"]}
+        started = not r.get("already_running")     # CHỈ tự đóng nếu chính call này mở (tránh đóng nhầm của flow khác)
         rec = running.get(pid)
         if not rec:                                   # bị đóng tay/prune xen giữa -> dừng gọn, không KeyError 500
             db.finish_run(rid, False, ["profile không còn mở"])

@@ -142,7 +142,7 @@ def serve_profile(profile: Profile, profiles_root: str | Path, *,
         if not ready["v"]:
             try: proc.terminate()              # terminate -> readline trả '' -> vòng thoát -> dọn + raise
             except Exception: pass             # noqa: BLE001
-    wd = threading.Timer(120, _watchdog); wd.daemon = True; wd.start()
+    wd = threading.Timer(180, _watchdog); wd.daemon = True; wd.start()   # 180s: dư cho cả lần tải browser đầu
     try:
         for _ in range(400):                   # camoufox khởi động chậm (~5-20s) + in vài dòng patch fingerprint
             line = proc.stdout.readline()
