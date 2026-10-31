@@ -147,14 +147,16 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
                 db.set_dynamic_data(pid, dyn)        # xoá pending (Chromium đã persist vào profile)
             except Exception:  # noqa: BLE001
                 pass
-        log_event("start", f"Mở {p.name} [{engine}]")
+        _btype = ((p.fingerprint_data or {}).get("browser", {}) or {}).get("browser_type", "Chrome")
+        log_event("start", f"Đã mở {_btype} với profile {p.name}")
         return {"id": pid, "engine": engine, "ws_endpoint": ep, "remote_debugging_address": ep}
 
     def _stop_one(pid: str) -> dict:
         item = running.pop(pid, None)
         if item:
             engines.graceful_stop(item[0], item[1], item[2])   # đóng mềm Chromium rồi terminate
-            log_event("stop", f"Đóng profile {pid[:8]}")
+            _p = db.get_profile(pid)
+            log_event("stop", f"Đã đóng profile {_p.name if _p else pid[:8]}")
         return {"id": pid, "stopped": bool(item)}
 
     def _prune_dead() -> None:
