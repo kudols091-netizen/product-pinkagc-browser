@@ -12,6 +12,7 @@ import json
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -136,14 +137,24 @@ def serve_profile(profile: Profile, profiles_root: str | Path, *,
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     out: list[str] = []
     assert proc.stdout is not None
-    for _ in range(400):                       # camoufox khởi động chậm (~5-20s) + in vài dòng patch fingerprint
-        line = proc.stdout.readline()
-        if not line:
-            break
-        s = line.decode(errors="replace").rstrip()
-        out.append(s)
-        if "CAMOUFOX_READY" in s:
-            return _CamoufoxHandle(proc, relay), f"camoufox-local://{profile.id}"
+    ready = {"v": False}
+    def _watchdog():                           # camoufox treo (proxy/mạng) mà không in READY -> readline chặn mãi
+        if not ready["v"]:
+            try: proc.terminate()              # terminate -> readline trả '' -> vòng thoát -> dọn + raise
+            except Exception: pass             # noqa: BLE001
+    wd = threading.Timer(120, _watchdog); wd.daemon = True; wd.start()
+    try:
+        for _ in range(400):                   # camoufox khởi động chậm (~5-20s) + in vài dòng patch fingerprint
+            line = proc.stdout.readline()
+            if not line:
+                break
+            s = line.decode(errors="replace").rstrip()
+            out.append(s)
+            if "CAMOUFOX_READY" in s:
+                ready["v"] = True; wd.cancel()
+                return _CamoufoxHandle(proc, relay), f"camoufox-local://{profile.id}"
+    finally:
+        wd.cancel()
     try:
         proc.terminate()
     except Exception:  # noqa: BLE001
