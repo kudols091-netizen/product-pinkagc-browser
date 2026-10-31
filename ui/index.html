@@ -429,6 +429,10 @@ const NAV=[
 
 /* ---------- helpers ---------- */
 const esc=s=>(s==null?"":String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// jsq: escape dữ liệu nhét vào chuỗi JS trong onclick="fn('...')". esc() (HTML-escape) KHÔNG đủ vì
+// trình duyệt giải mã entity (&#39;->') trước khi chạy JS -> thoát chuỗi = XSS. Dạng \xNN an toàn
+// cả trong HTML attribute lẫn chuỗi JS (không chứa ký tự đặc biệt HTML).
+const jsq=s=>(s==null?"":String(s)).replace(/[\\'"&<>\r\n]/g,c=>'\\x'+c.charCodeAt(0).toString(16).padStart(2,'0'));
 function toast(m,k=""){const t=document.getElementById("toast");t.textContent=m;t.className="show "+k;clearTimeout(t._t);t._t=setTimeout(()=>t.className=t.className.replace("show",""),2800);}
 async function j(url,opts){const r=await fetch(url,opts);const d=await r.json();if(!d.success)throw new Error(d.message||"Lỗi");return d.data;}
 const H={headers:{"Content-Type":"application/json"}};
@@ -439,7 +443,7 @@ function proxyBadge(raw){if(!raw)return '<span class="dim">Không proxy</span>';
   const sch=(raw.includes("://")?raw.split("://")[0]:"http").toUpperCase();
   const hostport=raw.replace(/^[a-z0-9]+:\/\//i,"").split(/[:@]/).slice(0,2).join(":");
   return `<span class="tag">${esc(sch)}</span> <span class="mono dim">${esc(hostport)}</span>`
-    +` <button class="icplain" title="Sao chép" onclick="event.stopPropagation();cp('${esc(hostport)}')">${svg(I.copy)}</button>`;}
+    +` <button class="icplain" title="Sao chép" onclick="event.stopPropagation();cp('${jsq(hostport)}')">${svg(I.copy)}</button>`;}
 const tagChips=tags=>{if(!tags||!tags.length)return '<span class="dim">—</span>';
   const shown=tags.slice(0,2).map(t=>`<span class="tagchip">${esc(t)}</span>`).join("");
   return shown+(tags.length>2?`<span class="tagchip" style="background:#efe9ee;color:var(--mut)" title="${esc(tags.slice(2).join(', '))}">+${tags.length-2}</span>`:"");};
@@ -586,7 +590,7 @@ function viewProfiles(){
             <button onclick="copyIdP('${p.id}')">${svg(I.doc)} Copy ID</button>
             <button onclick="teamShare('${p.id}')">${svg(I.share)} Chia sẻ (team)</button>
             <div class="ksep"></div>
-            <button class="danger" onclick="delP('${p.id}','${esc(p.name)}')">${svg(I.trash)} Xoá</button>
+            <button class="danger" onclick="delP('${p.id}','${jsq(p.name)}')">${svg(I.trash)} Xoá</button>
           </div>
         </div>
       </div></td></tr>`;}).join("")
@@ -757,7 +761,7 @@ function viewProxyBuy(){
 /* ----- Trash ----- */
 function viewTrash(){return `<div class="phead"><h1>Thùng <em>rác</em></h1><p>Profile đã xoá — khôi phục hoặc xoá vĩnh viễn.</p></div>
   <div class="card"><table><thead><tr><th>Tên profile</th><th>Proxy</th><th>Lần chạy cuối</th><th style="text-align:right">Thao tác</th></tr></thead><tbody id="trashBody"><tr><td colspan="4" class="dim" style="padding:24px">Đang tải...</td></tr></tbody></table></div>`;}
-async function loadTrash(){try{const l=await j(`${API}/profiles/trash`);document.getElementById("trashBody").innerHTML=l.length?l.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${proxyBadge(p.proxy)}</td><td class="dim">${fmtAgo(p.last_run_at)}</td><td><div class="rowact"><button class="btn sm pri" onclick="act('${p.id}/restore','Đã khôi phục',loadTrash)">${svg(I.shuffle)}Khôi phục</button><button class="btn sm" onclick="purge('${p.id}','${esc(p.name)}')">🗑 Xoá vĩnh viễn</button></div></td></tr>`).join(""):`<tr><td colspan="4"><div class="empty"><img src="mascot.png" onerror="this.style.display='none'"><h3>Thùng rác trống</h3><p>Không có dữ liệu để hiển thị.</p></div></td></tr>`;}catch(e){}}
+async function loadTrash(){try{const l=await j(`${API}/profiles/trash`);document.getElementById("trashBody").innerHTML=l.length?l.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${proxyBadge(p.proxy)}</td><td class="dim">${fmtAgo(p.last_run_at)}</td><td><div class="rowact"><button class="btn sm pri" onclick="act('${p.id}/restore','Đã khôi phục',loadTrash)">${svg(I.shuffle)}Khôi phục</button><button class="btn sm" onclick="purge('${p.id}','${jsq(p.name)}')">🗑 Xoá vĩnh viễn</button></div></td></tr>`).join(""):`<tr><td colspan="4"><div class="empty"><img src="mascot.png" onerror="this.style.display='none'"><h3>Thùng rác trống</h3><p>Không có dữ liệu để hiển thị.</p></div></td></tr>`;}catch(e){}}
 
 /* ----- Automation ----- */
 /* Trình dựng no-code: mỗi action + field tương ứng */
@@ -862,7 +866,7 @@ function viewAutomation(){const opts=STATE.profiles.map(p=>`<option value="${p.i
     <div class="inline" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <label style="margin:0;align-self:center;font-size:13px" class="dim">Kịch bản đã lưu:</label>
       <select id="auSaved" style="min-width:200px"><option value="">— chọn —</option></select>
-      <button class="btn sm" onclick="auLoadScript()">${svg(I.down)}Nạp</button>
+      <button class="btn sm" onclick="auLoadScript()">${svg(I.dl)}Nạp</button>
       <button class="btn sm" onclick="auDeleteScript()">🗑</button>
       <div class="grow"></div>
       <button class="btn sm pri" onclick="auSaveScript()">${svg(I.check)}Lưu kịch bản này</button>
@@ -992,8 +996,8 @@ function viewGroups(){
     <td>${svg(I.folder,"")}&nbsp; <b>${esc(g.name)}</b></td>
     <td class="dim">${g.count} profile</td>
     <td><div class="rowact">
-      <button class="btn sm" onclick="renameGroup('${g.id}','${esc(g.name)}')">Đổi tên</button>
-      <button class="btn sm" onclick="delGroup('${g.id}','${esc(g.name)}')">🗑</button></div></td></tr>`).join("")
+      <button class="btn sm" onclick="renameGroup('${g.id}','${jsq(g.name)}')">Đổi tên</button>
+      <button class="btn sm" onclick="delGroup('${g.id}','${jsq(g.name)}')">🗑</button></div></td></tr>`).join("")
     : `<tr><td colspan="3"><div class="empty"><h3>Chưa có nhóm</h3><p>Tạo nhóm để sắp xếp profile.</p></div></td></tr>`;
   return `<div class="phead"><h1>Quản lý <em>Nhóm</em></h1><p>Sắp xếp profile theo nhóm.</p></div>
    <div class="toolbar">
@@ -1361,11 +1365,11 @@ async function loadEngines(){let d;try{d=await j(`${API}/engines`);}catch(e){con
 function renderEngines(){const b=document.getElementById("engBody");if(!b)return;const d=STATE.engines||{},st=d.status||{};
   const inst=(d.installed||[]).map(e=>`<div class="austep" style="align-items:center">
     <span class="dot ok"></span><div style="flex:1"><b>Chrome ${esc(e.version)}</b>${e.builtin?' <span class="dim" style="font-size:12px">· gói sẵn</span>':''}</div>
-    ${e.builtin?'':`<button class="btn sm" onclick="engDelete('${esc(e.version)}')">🗑</button>`}</div>`).join("")||'<p class="dim">Chưa có engine.</p>';
+    ${e.builtin?'':`<button class="btn sm" onclick="engDelete('${jsq(e.version)}')">🗑</button>`}</div>`).join("")||'<p class="dim">Chưa có engine.</p>';
   const avail=(d.available||[]).map(e=>{const p=st[e.version],busy=p&&(p.state==='downloading'||p.state==='extracting');
     return `<div class="austep" style="align-items:center"><span class="dot"></span>
     <div style="flex:1"><b>Chrome ${esc(e.version)}</b> <span class="dim" style="font-size:12px">· ${e.size?('≈'+Math.round(e.size/1048576)+' MB'):'tải thêm'}${busy?(' · '+(p.state==='extracting'?'giải nén…':('tải '+p.pct+'%'))):''}${p&&p.state==='error'?(' · lỗi'):''}</span></div>
-    <button class="btn sm pri" ${busy?'disabled':''} onclick="engDownload('${esc(e.version)}','${esc(e.url)}')">${busy?'…':'⬇ Tải'}</button></div>`;}).join("")||'<p class="dim" style="font-size:13px">Không có bản để tải — cấu hình <code>engines_url</code> (manifest engines.json) ở Cài đặt, hoặc bản gói sẵn đã đủ dùng.</p>';
+    <button class="btn sm pri" ${busy?'disabled':''} onclick="engDownload('${jsq(e.version)}','${jsq(e.url)}')">${busy?'…':'⬇ Tải'}</button></div>`;}).join("")||'<p class="dim" style="font-size:13px">Không có bản để tải — cấu hình <code>engines_url</code> (manifest engines.json) ở Cài đặt, hoặc bản gói sẵn đã đủ dùng.</p>';
   b.innerHTML=`<div class="split" style="grid-template-columns:1fr 1fr;align-items:start">
     <div class="card" style="padding:18px"><b>Đã cài</b><div style="margin-top:10px">${inst}</div></div>
     <div class="card" style="padding:18px"><b>Tải thêm</b><div style="margin-top:10px">${avail}</div></div></div>`;}
@@ -1546,7 +1550,7 @@ function createTab(bro){
             ${svg('<path d="M6 9l6 6 6-6"/>','brosel-ca')}
           </button>
           <div class="brosel-menu" role="listbox">
-            ${(STATE.browsers.length?STATE.browsers:[{value:'chrome',label:'Chrome',engine:'chromium'}]).map((b,i)=>`<button type="button" role="option" data-v="${b.value}" class="${i===0?'on':''}" onclick="broPick('${b.value}','${esc(b.label)}')"><span class="brosel-ic">${broIcon(b.value)}</span><span>${esc(b.label)}</span></button>`).join("")}
+            ${(STATE.browsers.length?STATE.browsers:[{value:'chrome',label:'Chrome',engine:'chromium'}]).map((b,i)=>`<button type="button" role="option" data-v="${b.value}" class="${i===0?'on':''}" onclick="broPick('${b.value}','${jsq(b.label)}')"><span class="brosel-ic">${broIcon(b.value)}</span><span>${esc(b.label)}</span></button>`).join("")}
           </div>
           <select id="cBrowser" onchange="updateSum()" style="display:none">${bro}</select>
         </div>
