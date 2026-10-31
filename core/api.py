@@ -624,6 +624,25 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             return _err(msg, code)
         return _ok(res)
 
+    @app.post("/api/v3/profiles/<pid>/fpcheck")
+    def fp_check(pid: str):
+        """Test độ kín fingerprint: mở profile -> chấm verdict iphey + mở creepjs/pixelscan để soi tay."""
+        r = _start_one(pid, {"headless": False})     # cần cửa sổ thật để test đúng như khi dùng
+        if r.get("error"):
+            return _err(r["error"], 404 if r["error"] == "not found" else 500)
+        if r.get("engine") == "camoufox":
+            return _err("Test fingerprint hiện hỗ trợ engine Chrome/ovobrowser (camoufox chưa có automation)", 400)
+        rec = running.get(pid)
+        if not rec:
+            return _err("profile không còn mở", 500)
+        from . import automation
+        try:
+            out = automation.fingerprint_check(rec[1], engine=rec[2])
+        except Exception as e:  # noqa: BLE001
+            return _err(f"test lỗi: {e}", 500)
+        log_event("fpcheck", f"Test fingerprint: iphey={out.get('iphey')}")
+        return _ok(out)
+
     @app.post("/api/v3/profiles/<pid>/record/start")
     def record_start(pid: str):
         rec = running.get(pid)

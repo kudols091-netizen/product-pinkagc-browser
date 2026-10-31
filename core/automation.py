@@ -219,6 +219,49 @@ def inject_cookies(ws_endpoint: str, cookies: list[dict], *, engine: str = "chro
     return len(cookies)
 
 
+_IPHEY_JS = r"""() => {
+  const kw = /^(trustworthy|suspicious|untrustworthy)$/i;
+  let verdict='', note='';
+  document.querySelectorAll('h1,h2,h3,div,span,p,strong,b').forEach(e=>{
+    if(e.childElementCount) return;
+    const t=(e.innerText||'').trim();
+    if(!verdict && kw.test(t)) verdict=t;
+    if(!note && /signals?\s+detected|no\s+suspicious/i.test(t) && t.length<90) note=t;
+  });
+  return {verdict, note};
+}"""
+
+
+def fingerprint_check(ws_endpoint: str, *, engine: str = "chromium", timeout: int = 45000) -> dict:
+    """Test độ 'kín' của fingerprint profile: chấm verdict iphey.com (tin cậy) + mở creepjs/pixelscan
+    thành tab cho user soi tay (scrape 2 site kia không ổn định). Trình duyệt phải đang mở (CDP Chromium).
+    Trả {iphey, note, opened[]}."""
+    from playwright.sync_api import sync_playwright
+    res = {"iphey": "", "note": "", "opened": []}
+    with sync_playwright() as pw:
+        browser = _connect(pw, engine, ws_endpoint)
+        ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+        try:
+            pg = ctx.new_page()
+            try:
+                pg.goto("https://iphey.com/", wait_until="domcontentloaded", timeout=timeout)
+                pg.wait_for_timeout(9000)               # iphey tính vài giây
+                d = pg.evaluate(_IPHEY_JS)
+                res["iphey"] = d.get("verdict") or "(không đọc được)"
+                res["note"] = d.get("note") or ""
+            except Exception as e:  # noqa: BLE001
+                res["iphey"] = "lỗi"; res["note"] = str(e)[:120]
+            for url in ("https://abrahamjuliot.github.io/creepjs/", "https://pixelscan.net/"):
+                try:
+                    ctx.new_page().goto(url, wait_until="commit", timeout=15000)
+                    res["opened"].append(url)
+                except Exception:  # noqa: BLE001
+                    pass
+        finally:
+            browser.close()          # ngắt CDP, trình duyệt + tab vẫn mở cho user xem
+    return res
+
+
 # ---------------------------------------------------------------- engine thực thi
 
 class _Ctx:
