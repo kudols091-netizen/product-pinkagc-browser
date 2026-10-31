@@ -229,6 +229,7 @@ def check(raw_proxy: str, *, timeout: float = 10.0,
         if ip:
             return {"alive": True, "latency_ms": latency, "exit_ip": ip,
                     "country": (data or {}).get("country") or (data or {}).get("countryCode", ""),
+                    "country_code": (data or {}).get("countryCode", ""),
                     "scheme": sch}
         last_err = "không đọc được exit IP"
     return {"alive": False, "error": last_err}

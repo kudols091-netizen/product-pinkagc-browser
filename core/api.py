@@ -780,7 +780,8 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         from datetime import datetime, timezone
         meta = db.update_proxy_meta(prx, {
             "alive": res.get("alive"), "exit_ip": res.get("exit_ip"),
-            "country": res.get("country"), "latency_ms": res.get("latency_ms"),
+            "country": res.get("country"), "country_code": res.get("country_code", ""),
+            "latency_ms": res.get("latency_ms"),
             "scheme": res.get("scheme"), "error": res.get("error"),
             "checked_at": datetime.now(timezone.utc).isoformat()})
         return _ok({**res, "id": prx, "meta": meta})

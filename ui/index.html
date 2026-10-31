@@ -157,6 +157,11 @@
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid var(--line2);color:var(--mut)}
   .pill.run{color:var(--ok);border-color:#bfe8d2;background:var(--okbg)}
   .tag{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:7px;background:#f3eef1;color:#7a7183}
+  .pbadge{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:7px;letter-spacing:.2px}
+  .pbadge.http{background:#fde4f1;color:#c2185b} .pbadge.socks{background:#e9e2ff;color:#5b3ad6}
+  .ccode{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;background:#eceefb;color:#4a5578;margin-right:7px;letter-spacing:.5px;vertical-align:middle}
+  [data-theme="dark"] .ccode{background:#2a2740;color:#b8acc4}
+  [data-theme="dark"] .pbadge.http{background:#3a1430;color:#ff8cc4} [data-theme="dark"] .pbadge.socks{background:#2a2250;color:#b9a8ff}
   .tag.cr{color:#2563eb;background:#eaf1fe}.tag.ff{color:#c2410c;background:#fef0e7}
   .tagchip{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--primary-soft);color:var(--primary);margin:1px 2px}
   .hcol-os .c-os,.hcol-browser .c-browser,.hcol-engine .c-engine,.hcol-tz .c-tz,.hcol-lastrun .c-lastrun,.hcol-tags .c-tags{display:none}
@@ -652,18 +657,23 @@ function viewProxy(){
       : m.alive===false ? `<span style="color:var(--err)"><span class="dot err"></span>Chết${m.checked_at?' · '+fmtAgo(m.checked_at):''}</span>`
       : m.alive ? `<span style="color:var(--ok)"><span class="dot ok"></span>Sống${m.checked_at?' · '+fmtAgo(m.checked_at):''}</span>`
       : '<span class="dim"><span class="dot off"></span>Chưa kiểm tra</span>';
+    const p=parsePrx(x.raw_proxy);
+    const auth=p.user?`${esc(p.user)} <span class="dim" style="letter-spacing:1px" title="mật khẩu được ẩn">••••</span>`:'<span class="dim">—</span>';
+    const cc=(m.country_code||'').toUpperCase();const flag=cc?`<span class="ccode">${esc(cc)}</span>`:'';
     return `<tr>
       <td><input type="checkbox" class="chk" ${sel.has(x.id)?'checked':''} onchange="togglePrxSel('${x.id}',this.checked)"></td>
-      <td class="mono">${esc(x.raw_proxy)}</td>
-      <td class="dim">${esc(m.country||m.exit_ip||'—')}</td>
-      <td class="dim">${esc((x.raw_proxy.split('://')[0]||'http').toUpperCase())}</td>
+      <td class="mono">${esc(p.host)}${p.port?':'+esc(p.port):''}</td>
+      <td><span class="pbadge ${p.scheme.toLowerCase().includes('socks')?'socks':'http'}">${esc(p.scheme)}</span></td>
+      <td>${auth}</td>
+      <td class="dim">${flag}${esc(m.country||'—')}</td>
+      <td class="dim mono">${esc(m.exit_ip||'—')}</td>
       <td class="dim">${m.latency_ms!=null?m.latency_ms+' ms':'—'}</td>
       <td>${st}</td>
       <td><div class="rowact">
         <button class="btn sm ghost-pink" ${x._checking?'disabled':''} onclick="checkPrx('${x.id}')">${svg(I.play)}Kiểm tra</button>
         <button class="btn sm" onclick="delPrx('${x.id}')">🗑</button></div></td></tr>`;}).join("")
-    : (all.length?`<tr><td colspan="7" class="dim" style="padding:26px;text-align:center">Không có proxy khớp bộ lọc.</td></tr>`
-       :`<tr><td colspan="7"><div class="empty"><h3>Chưa có proxy</h3><p>Bấm <b>Thêm proxy</b>. Hỗ trợ dán trần — tự nhận http/socks5.</p></div></td></tr>`);
+    : (all.length?`<tr><td colspan="9" class="dim" style="padding:26px;text-align:center">Không có proxy khớp bộ lọc.</td></tr>`
+       :`<tr><td colspan="9"><div class="empty"><h3>Chưa có proxy</h3><p>Bấm <b>Thêm proxy</b>. Hỗ trợ dán trần — tự nhận http/socks5.</p></div></td></tr>`);
   const sic=k=>sk===k?(sd>0?' ▲':' ▼'):'';
   const fbtn=(f,label,n)=>`<button class="${STATE.prxFilter===f?'on':''}" onclick="filterPrx('${f}')">${label}${n!=null?` (${n})`:''}</button>`;
   STATE.proxyTab=STATE.proxyTab||'manage';
@@ -689,10 +699,18 @@ function viewProxy(){
         <button class="btn sm ghost-pink" onclick="checkSelectedPrx()">${svg(I.play)}Kiểm tra đã chọn</button>
         <button class="btn sm" onclick="togglePrxAll(false)">Bỏ chọn</button>`:''}</div>`:''}
     <div class="card"><table>
-      <thead><tr><th style="width:36px"><input type="checkbox" class="chk" ${allSel?'checked':''} onchange="togglePrxAll(this.checked)"></th><th>IP:Port</th><th>Quốc gia / Exit IP</th><th>Loại</th><th style="cursor:pointer" onclick="sortPrx('latency')">Độ trễ${sic('latency')}</th><th style="cursor:pointer" onclick="sortPrx('status')">Trạng thái${sic('status')}</th><th style="text-align:right">Thao tác</th></tr></thead>
+      <thead><tr><th style="width:36px"><input type="checkbox" class="chk" ${allSel?'checked':''} onchange="togglePrxAll(this.checked)"></th><th>Địa chỉ</th><th>Giao thức</th><th>Xác thực</th><th>Quốc gia</th><th>Exit IP</th><th style="cursor:pointer" onclick="sortPrx('latency')">Độ trễ${sic('latency')}</th><th style="cursor:pointer" onclick="sortPrx('status')">Trạng thái${sic('status')}</th><th style="text-align:right">Thao tác</th></tr></thead>
       <tbody>${rows}</tbody></table>
       <div class="pager2"><div class="grow"></div><span>Hiển thị <b>${view.length}</b>/${all.length} proxy</span></div></div>`;
 }
+function parsePrx(raw){raw=(raw||'').trim();let scheme='http';
+  if(raw.includes('://')){const i=raw.indexOf('://');scheme=raw.slice(0,i)||'http';raw=raw.slice(i+3);}
+  let user='',pass='';
+  if(raw.includes('@')){const at=raw.lastIndexOf('@');const cred=raw.slice(0,at);raw=raw.slice(at+1);const ci=cred.indexOf(':');if(ci>=0){user=cred.slice(0,ci);pass=cred.slice(ci+1);}else user=cred;}
+  const parts=raw.split(':');const host=parts[0]||'',port=parts[1]||'';
+  if(parts.length>=4&&!user){user=parts[2];pass=parts.slice(3).join(':');}
+  return {scheme:(scheme||'http').toUpperCase(),host,port,user,pass};}
+function flagEmoji(cc){cc=(cc||'').trim().toUpperCase();return cc.length===2?cc.replace(/./g,c=>String.fromCodePoint(127397+c.charCodeAt(0))):'';}
 function _prxView(){const q=(STATE.prxQ||'').toLowerCase(),f=STATE.prxFilter||'all';
   return STATE.proxies.filter(x=>{const m=x.meta||{};
     if(f==='alive'&&m.alive!==true)return false;
