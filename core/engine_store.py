@@ -10,6 +10,7 @@ Tải/giải nén tách khỏi mạng (`_opener` injectable) -> test được. D
 from __future__ import annotations
 
 import glob
+import hashlib
 import json
 import os
 import re
@@ -24,6 +25,7 @@ ENGINES_DIR = Path("engines")           # cạnh app (cwd = BASE sau app.py chdi
 DEFAULT_CATALOG_URL = "https://agency.pinkagc.com/browser/engines.json"
 
 _progress: dict[str, dict] = {}         # version -> {pct, state(downloading|extracting|done|error), msg}
+_VER_RE = re.compile(r"^[\w.\-]+$")     # chặn path traversal: version chỉ chữ/số/._- (không có / hay ..)
 
 
 def _find_chrome(d: str | Path) -> str | None:
@@ -70,9 +72,11 @@ def download_status() -> dict:
     return _progress
 
 
-def download_version(version: str, url: str, *,
+def download_version(version: str, url: str, *, sha256: str = "",
                      _opener: Callable[..., Any] = urllib.request.urlopen) -> dict:
-    """Tải zip -> giải nén vào engines/<version>/. Cập nhật _progress. Ném nếu lỗi."""
+    """Tải zip -> (verify sha256 nếu có) -> giải nén vào engines/<version>/. Cập nhật _progress. Ném nếu lỗi."""
+    if not _VER_RE.match(version or ""):
+        raise ValueError(f"version không hợp lệ: {version!r}")
     ENGINES_DIR.mkdir(parents=True, exist_ok=True)
     dest = ENGINES_DIR / version
     tmp = ENGINES_DIR / (version + ".zip")
@@ -90,6 +94,13 @@ def download_version(version: str, url: str, *,
                     done += len(chunk)
                     if total:
                         _progress[version]["pct"] = min(99, int(done * 100 / total))
+        if sha256:                                    # verify toàn vẹn trước khi giải nén/chạy (chống gói bị can thiệp)
+            h = hashlib.sha256()
+            with open(tmp, "rb") as f:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    h.update(chunk)
+            if h.hexdigest().lower() != sha256.strip().lower():
+                raise RuntimeError("sha256 không khớp — gói tải về có thể bị can thiệp, đã huỷ")
         _progress[version] = {"pct": 100, "state": "extracting", "msg": ""}
         if dest.exists():
             shutil.rmtree(dest, ignore_errors=True)
@@ -107,16 +118,18 @@ def download_version(version: str, url: str, *,
         raise
 
 
-def download_async(version: str, url: str) -> None:
+def download_async(version: str, url: str, *, sha256: str = "") -> None:
     def run() -> None:
         try:
-            download_version(version, url)
+            download_version(version, url, sha256=sha256)
         except Exception:  # noqa: BLE001
             pass
     threading.Thread(target=run, daemon=True).start()
 
 
 def delete_version(version: str) -> None:
+    if not _VER_RE.match(version or ""):              # chặn traversal trên rmtree
+        return
     d = ENGINES_DIR / version
     if d.exists():
         shutil.rmtree(d, ignore_errors=True)

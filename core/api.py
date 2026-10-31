@@ -8,6 +8,7 @@ Kèm UI quản profile tại http://127.0.0.1:19996/ (phần B — dùng web she
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -78,9 +79,20 @@ def parse_cookies(data: Any) -> list[dict]:
 
 def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
     app = Flask(__name__)
+
+    _ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+    @app.before_request
+    def _guard_host():                                # chặn DNS-rebinding: web ngoài trỏ domain -> 127.0.0.1
+        host = (request.host or "").rsplit(":", 1)[0].strip("[]")
+        if host not in _ALLOWED_HOSTS:
+            return jsonify({"error": "forbidden host"}), 403
+
     db = Database(db_path)
     profiles_root = str(profiles_root)
     running: dict[str, tuple[Any, str, str]] = {}   # pid -> (handle, endpoint, engine)
+    _rlock = threading.Lock()                        # Flask threaded=True -> khoá mọi đọc/ghi `running`
+    _starting: set[str] = set()                      # pid đang serve() dở (chống start trùng -> mồ côi)
 
     # ---- settings (JSON cạnh DB) + log (ring buffer trong RAM) ----
     _settings_file = Path(db_path).parent / "settings.json"
@@ -127,16 +139,25 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         p = db.get_profile(pid)
         if not p:
             return {"id": pid, "error": "not found"}
-        if pid in running:
-            _, ep, eng = running[pid]
-            return {"id": pid, "ws_endpoint": ep, "remote_debugging_address": ep,
-                    "engine": eng, "already_running": True}
-        engine = engines.resolve_engine(p, opts.get("engine"))
+        with _rlock:                                  # check + giữ chỗ nguyên tử: chặn 2 lệnh Start cùng pid
+            if pid in running:
+                _, ep, eng = running[pid]
+                return {"id": pid, "ws_endpoint": ep, "remote_debugging_address": ep,
+                        "engine": eng, "already_running": True}
+            if pid in _starting:
+                return {"id": pid, "error": "profile đang được mở, thử lại sau"}
+            _starting.add(pid)
         try:
-            handle, ep = engines.serve(engine, p, profiles_root, headless=bool(opts.get("headless", False)))
-        except Exception as e:  # noqa: BLE001
-            return {"id": pid, "error": f"launch failed ({engine}): {e}"}
-        running[pid] = (handle, ep, engine)
+            engine = engines.resolve_engine(p, opts.get("engine"))
+            try:
+                handle, ep = engines.serve(engine, p, profiles_root, headless=bool(opts.get("headless", False)))
+            except Exception as e:  # noqa: BLE001
+                return {"id": pid, "error": f"launch failed ({engine}): {e}"}
+            with _rlock:
+                running[pid] = (handle, ep, engine)
+        finally:
+            with _rlock:
+                _starting.discard(pid)
         db.mark_run(pid)
         dyn = p.dynamic_data or {}
         pend = dyn.pop("cookies_pending", None)      # nạp cookie import vào trình duyệt vừa mở
@@ -152,7 +173,8 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         return {"id": pid, "engine": engine, "ws_endpoint": ep, "remote_debugging_address": ep}
 
     def _stop_one(pid: str) -> dict:
-        item = running.pop(pid, None)
+        with _rlock:
+            item = running.pop(pid, None)
         if item:
             engines.graceful_stop(item[0], item[1], item[2])   # đóng mềm Chromium rồi terminate
             _p = db.get_profile(pid)
@@ -162,8 +184,9 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
     def _prune_dead() -> None:
         """Gỡ profile mà tiến trình trình duyệt đã thoát (user bấm X đóng cửa sổ tay) khỏi `running`,
         để status quay về 'sẵn sàng' thay vì kẹt 'đang chạy'. Gọi trước mỗi lần liệt kê/báo status."""
-        for pid in list(running):
-            h = running[pid][0]
+        with _rlock:
+            items = list(running.items())              # snapshot: tránh KeyError khi thread khác pop giữa chừng
+        for pid, (h, _ep, _eng) in items:
             proc = getattr(h, "proc", h)   # RelayHandle/_CamoufoxHandle -> .proc; ovobrowser/botbrowser -> Popen
             try:
                 dead = proc.poll() is not None
@@ -190,7 +213,11 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             if r.get("error"):
                 db.finish_run(rid, False, [r["error"]])
                 return {"error": r["error"]}
-        ws, eng = running[pid][1], running[pid][2]
+        rec = running.get(pid)
+        if not rec:                                   # bị đóng tay/prune xen giữa -> dừng gọn, không KeyError 500
+            db.finish_run(rid, False, ["profile không còn mở"])
+            return {"error": "profile không còn mở"}
+        ws, eng = rec[1], rec[2]
         try:
             workdir = str(Path(profiles_root) / (p.storage_path or pid))
             result = automation.run_script(ws, steps, engine=eng, workdir=workdir)
@@ -296,7 +323,9 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
     @app.post("/api/v3/profiles/start/<pid>")
     def start_profile(pid: str):
         r = _start_one(pid, request.get_json(silent=True) or {})
-        return _err(r["error"], 500) if r.get("error") else _ok(r)
+        if r.get("error"):
+            return _err(r["error"], 404 if r["error"] == "not found" else 500)
+        return _ok(r)
 
     @app.post("/api/v3/profiles/stop/<pid>")
     def stop_profile(pid: str):
@@ -546,10 +575,11 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
 
     @app.post("/api/v3/profiles/<pid>/record/start")
     def record_start(pid: str):
-        if pid not in running:
+        rec = running.get(pid)
+        if not rec:
             return _err("profile chưa mở — mở profile trước khi ghi thao tác", 400)
         from . import automation
-        ws, eng = running[pid][1], running[pid][2]
+        ws, eng = rec[1], rec[2]
         try:
             automation.start_recording(ws, engine=eng)
         except Exception as e:  # noqa: BLE001
@@ -558,10 +588,11 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
 
     @app.post("/api/v3/profiles/<pid>/record/fetch")
     def record_fetch(pid: str):
-        if pid not in running:
+        rec = running.get(pid)
+        if not rec:
             return _err("profile chưa mở", 400)
         from . import automation
-        ws, eng = running[pid][1], running[pid][2]
+        ws, eng = rec[1], rec[2]
         try:
             steps = automation.fetch_recording(ws, engine=eng)
         except Exception as e:  # noqa: BLE001
@@ -697,10 +728,15 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
     def engines_download():
         from . import engine_store
         b = request.get_json(silent=True) or {}
-        ver, url = b.get("version"), b.get("url")
-        if not ver or not url:
-            return _err("thiếu version hoặc url")
-        engine_store.download_async(ver, url)         # tải nền, poll /engines/status
+        ver = b.get("version")
+        if not ver:
+            return _err("thiếu version")
+        # Lấy url + sha256 TỪ CATALOG theo version (không tin url client -> chặn SSRF/gói lạ)
+        cat = engine_store.fetch_catalog(_load_settings().get("engines_url", ""))
+        entry = next((c for c in cat if c.get("version") == ver), None)
+        if not entry or not entry.get("url"):
+            return _err("version không có trong danh mục engine", 404)
+        engine_store.download_async(ver, entry["url"], sha256=entry.get("sha256", ""))  # tải nền, poll /engines/status
         return _ok({"started": True, "version": ver})
 
     @app.get("/api/v3/engines/status")
@@ -1042,7 +1078,7 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         info = updater.check()
         if not info.get("has_update"):
             return _err("Không có bản mới (hoặc chưa cấu hình UPDATE_URL).")
-        ok, msg = updater.apply_update(info.get("url", ""))
+        ok, msg = updater.apply_update(info.get("url", ""), info.get("sha256", ""))
         if ok:
             import os as _os
             import threading

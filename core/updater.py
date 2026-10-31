@@ -42,12 +42,13 @@ def check() -> dict:
     latest = str(info.get("version", ""))
     return {"current": brand.VERSION, "latest": latest,
             "has_update": bool(latest) and _ver_tuple(latest) > _ver_tuple(brand.VERSION),
-            "url": info.get("url", ""), "notes": info.get("notes", "")}
+            "url": info.get("url", ""), "notes": info.get("notes", ""),
+            "sha256": info.get("sha256", "")}
 
 
-def apply_update(dl_url: str) -> tuple[bool, str]:
-    """Tải exe mới + dựng .bat thay nóng + hẹn khởi động lại. CHỈ bản đóng gói.
-    Trả (ok, message). Nếu ok, app NÊN tự thoát ngay sau để .bat thay được file."""
+def apply_update(dl_url: str, sha256: str = "") -> tuple[bool, str]:
+    """Tải exe mới + (verify sha256 nếu manifest có) + dựng .bat thay nóng + hẹn khởi động lại.
+    CHỈ bản đóng gói. Trả (ok, message). Nếu ok, app NÊN tự thoát ngay sau để .bat thay được file."""
     if not is_frozen():
         return False, "Bản dev: dùng `git pull` để cập nhật (self-update chỉ áp cho bản .exe đóng gói)."
     if not dl_url:
@@ -55,12 +56,27 @@ def apply_update(dl_url: str) -> tuple[bool, str]:
     exe = Path(sys.executable)                       # PinkAgcBrowser.exe đang chạy
     new = exe.with_name(exe.stem + "_new.exe")
     try:
-        urllib.request.urlretrieve(dl_url, new)      # tải cạnh exe
+        with urllib.request.urlopen(dl_url, timeout=120) as r, open(new, "wb") as f:  # timeout tránh treo vô hạn
+            while True:
+                chunk = r.read(1 << 20)
+                if not chunk:
+                    break
+                f.write(chunk)
     except Exception as e:  # noqa: BLE001
+        new.unlink(missing_ok=True)
         return False, f"Tải thất bại: {e}"
     if new.stat().st_size < 1024:
         new.unlink(missing_ok=True)
         return False, "File tải về rỗng/hỏng."
+    if sha256:                                        # verify toàn vẹn trước khi thay exe (chống MITM/host bị chiếm)
+        import hashlib
+        h = hashlib.sha256()
+        with open(new, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        if h.hexdigest().lower() != sha256.strip().lower():
+            new.unlink(missing_ok=True)
+            return False, "sha256 không khớp — bản tải về có thể bị can thiệp, đã huỷ cập nhật."
     bat = exe.with_name("_update.bat")
     bat.write_text(
         "@echo off\r\n"
