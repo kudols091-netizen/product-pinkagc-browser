@@ -378,6 +378,8 @@ const I={
   palette:'<path d="M12 3a9 9 0 1 0 1 18c.9 0 1.3-.9.8-1.6-.5-.7-.1-1.9 1-1.9H17a4 4 0 0 0 4-4c0-4.4-4-7.5-9-7.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="11" r="1"/>',
   dl:'<path d="M12 3v12M7 11l5 4 5-4M5 20h14"/>',
   link:'<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>',
+  eye:'<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff:'<path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c7 0 11 8 11 8a18 18 0 0 1-3 3.9M6.6 6.6A18 18 0 0 0 1 12s4 8 11 8a10.9 10.9 0 0 0 5.4-1.4M2 2l20 20M9.5 9.5a3 3 0 0 0 4.2 4.2"/>',
   plus:'<path d="M12 5v14M5 12h14"/>', play:'<path d="M6 4l14 8-14 8z"/>', stop:'<rect x="6" y="6" width="12" height="12" rx="2"/>',
   search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>', up:'<path d="M12 20V8M6 14l6-6 6 6"/>',
   check:'<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-5"/>', dots:'<circle cx="12" cy="6" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="18" r="1"/>',
@@ -640,6 +642,7 @@ function viewProfiles(){
 /* ----- Proxy ----- */
 function viewProxy(){
   STATE.prxSel=STATE.prxSel||new Set();
+  if(STATE.prxShowPass===undefined){try{STATE.prxShowPass=localStorage.getItem('pinkagc_prx_showpass')==='1';}catch(e){STATE.prxShowPass=false;}}
   STATE.prxFilter=STATE.prxFilter||'all';
   STATE.prxSort=STATE.prxSort||{key:null,dir:1};
   const sel=STATE.prxSel, all=STATE.proxies, q=(STATE.prxQ||'').toLowerCase();
@@ -658,7 +661,11 @@ function viewProxy(){
       : m.alive ? `<span style="color:var(--ok)"><span class="dot ok"></span>Sống${m.checked_at?' · '+fmtAgo(m.checked_at):''}</span>`
       : '<span class="dim"><span class="dot off"></span>Chưa kiểm tra</span>';
     const p=parsePrx(x.raw_proxy);
-    const auth=p.user?`${esc(p.user)} <span class="dim" style="letter-spacing:1px" title="mật khẩu được ẩn">••••</span>`:'<span class="dim">—</span>';
+    const auth=p.user
+      ? (STATE.prxShowPass
+          ? `<span class="mono">${esc(p.user)}${p.pass?':'+esc(p.pass):''}</span>`
+          : `${esc(p.user)} <span class="dim" style="letter-spacing:1px" title="bấm Hiện mật khẩu để xem">••••</span>`)
+      : '<span class="dim">—</span>';
     const cc=(m.country_code||'').toUpperCase();const flag=cc?`<span class="ccode">${esc(cc)}</span>`:'';
     return `<tr>
       <td><input type="checkbox" class="chk" ${sel.has(x.id)?'checked':''} onchange="togglePrxSel('${x.id}',this.checked)"></td>
@@ -671,7 +678,8 @@ function viewProxy(){
       <td>${st}</td>
       <td><div class="rowact">
         <button class="btn sm ghost-pink" ${x._checking?'disabled':''} onclick="checkPrx('${x.id}')">${svg(I.play)}Kiểm tra</button>
-        <button class="btn sm" onclick="delPrx('${x.id}')">🗑</button></div></td></tr>`;}).join("")
+        <button class="btn sm" onclick="copyPrx('${x.id}')" title="Copy proxy">${svg(I.copy)}</button>
+        <button class="btn sm" onclick="delPrx('${x.id}')" title="Xoá">🗑</button></div></td></tr>`;}).join("")
     : (all.length?`<tr><td colspan="9" class="dim" style="padding:26px;text-align:center">Không có proxy khớp bộ lọc.</td></tr>`
        :`<tr><td colspan="9"><div class="empty"><h3>Chưa có proxy</h3><p>Bấm <b>Thêm proxy</b>. Hỗ trợ dán trần — tự nhận http/socks5.</p></div></td></tr>`);
   const sic=k=>sk===k?(sd>0?' ▲':' ▼'):'';
@@ -694,6 +702,7 @@ function viewProxy(){
     ${all.length?`<div class="toolbar" style="margin-top:-4px;align-items:center">
       <div class="seg">${fbtn('all','Tất cả',all.length)}${fbtn('alive','Sống',cAlive)}${fbtn('dead','Chết',cDead)}${fbtn('unchecked','Chưa KT',cUn)}</div>
       <button class="btn sm ${sk==='latency'?'ghost-pink':''}" onclick="sortPrx('latency')">${svg(I.up)}Độ trễ${sic('latency')}</button>
+      <button class="btn sm ${STATE.prxShowPass?'ghost-pink':''}" onclick="togglePrxPass()" title="Ẩn/hiện mật khẩu proxy trong bảng">${svg(STATE.prxShowPass?I.eye:I.eyeoff)}${STATE.prxShowPass?'Ẩn mật khẩu':'Hiện mật khẩu'}</button>
       <div class="grow"></div>
       ${sel.size?`<span class="dim"><b style="color:var(--primary)">${sel.size}</b> chọn</span>
         <button class="btn sm ghost-pink" onclick="checkSelectedPrx()">${svg(I.play)}Kiểm tra đã chọn</button>
@@ -718,6 +727,8 @@ function _prxView(){const q=(STATE.prxQ||'').toLowerCase(),f=STATE.prxFilter||'a
     if(f==='unchecked'&&m.alive!=null)return false;
     if(q&&!((x.raw_proxy||'').toLowerCase().includes(q)||String(m.country||'').toLowerCase().includes(q)))return false;
     return true;});}
+function togglePrxPass(){STATE.prxShowPass=!STATE.prxShowPass;try{localStorage.setItem('pinkagc_prx_showpass',STATE.prxShowPass?'1':'');}catch(e){}render();}
+function copyPrx(id){const x=STATE.proxies.find(p=>p.id===id);if(x)cp(x.raw_proxy);}
 function filterPrx(f){STATE.prxFilter=f;render();}
 function sortPrx(k){const s=STATE.prxSort=STATE.prxSort||{key:null,dir:1};if(s.key===k)s.dir=-s.dir;else{s.key=k;s.dir=1;}render();}
 function searchPrx(v){STATE.prxQ=v;render();const e=document.getElementById('prxQ');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}}
