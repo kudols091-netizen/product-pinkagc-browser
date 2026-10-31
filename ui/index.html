@@ -635,9 +635,18 @@ function viewProfiles(){
 /* ----- Proxy ----- */
 function viewProxy(){
   STATE.prxSel=STATE.prxSel||new Set();
-  const list=STATE.proxies, sel=STATE.prxSel;
-  const allSel=list.length>0 && list.every(x=>sel.has(x.id));
-  const rows=list.length? list.map(x=>{
+  STATE.prxFilter=STATE.prxFilter||'all';
+  STATE.prxSort=STATE.prxSort||{key:null,dir:1};
+  const sel=STATE.prxSel, all=STATE.proxies, q=(STATE.prxQ||'').toLowerCase();
+  const cAlive=all.filter(x=>(x.meta||{}).alive===true).length;
+  const cDead=all.filter(x=>(x.meta||{}).alive===false).length;
+  const cUn=all.filter(x=>(x.meta||{}).alive==null).length;
+  let view=_prxView();
+  const sk=STATE.prxSort.key, sd=STATE.prxSort.dir;
+  if(sk==='latency')view=view.slice().sort((a,b)=>{const va=(a.meta||{}).latency_ms,vb=(b.meta||{}).latency_ms;return ((va==null?1e9:va)-(vb==null?1e9:vb))*sd;});
+  else if(sk==='status')view=view.slice().sort((a,b)=>{const rk=x=>{const al=(x.meta||{}).alive;return al===true?0:al==null?1:2;};return (rk(a)-rk(b))*sd;});
+  const allSel=view.length>0 && view.every(x=>sel.has(x.id));
+  const rows=view.length? view.map(x=>{
     const m=x.meta||{};
     const st = x._checking ? '<span class="dim"><span class="spin"></span>Đang kiểm tra…</span>'
       : m.alive===false ? `<span style="color:var(--err)"><span class="dot err"></span>Chết${m.checked_at?' · '+fmtAgo(m.checked_at):''}</span>`
@@ -653,7 +662,10 @@ function viewProxy(){
       <td><div class="rowact">
         <button class="btn sm ghost-pink" ${x._checking?'disabled':''} onclick="checkPrx('${x.id}')">${svg(I.play)}Kiểm tra</button>
         <button class="btn sm" onclick="delPrx('${x.id}')">🗑</button></div></td></tr>`;}).join("")
-    : `<tr><td colspan="7"><div class="empty"><h3>Chưa có proxy</h3><p>Bấm <b>Thêm proxy</b>. Hỗ trợ dán trần — tự nhận http/socks5.</p></div></td></tr>`;
+    : (all.length?`<tr><td colspan="7" class="dim" style="padding:26px;text-align:center">Không có proxy khớp bộ lọc.</td></tr>`
+       :`<tr><td colspan="7"><div class="empty"><h3>Chưa có proxy</h3><p>Bấm <b>Thêm proxy</b>. Hỗ trợ dán trần — tự nhận http/socks5.</p></div></td></tr>`);
+  const sic=k=>sk===k?(sd>0?' ▲':' ▼'):'';
+  const fbtn=(f,label,n)=>`<button class="${STATE.prxFilter===f?'on':''}" onclick="filterPrx('${f}')">${label}${n!=null?` (${n})`:''}</button>`;
   STATE.proxyTab=STATE.proxyTab||'manage';
   const head=`<div class="phead"><h1>Quản lý <em>Proxy</em></h1><p>Thêm, kiểm tra và quản lý danh sách proxy để dùng cho profile.</p></div>
     <div class="tabs" style="margin-bottom:18px">
@@ -665,19 +677,32 @@ function viewProxy(){
     <div class="toolbar">
       <button class="btn pri" onclick="addPrx()">${svg(I.plus)}Thêm proxy</button>
       <button class="btn" onclick="addPrx()">${svg(I.up)}Import hàng loạt</button>
-      ${list.length?`<button class="btn ghost-pink" onclick="checkAllPrx()">${svg(I.play)}Kiểm tra tất cả</button>`:''}
+      ${all.length?`<button class="btn ghost-pink" onclick="checkAllPrx()">${svg(I.play)}Kiểm tra tất cả</button>`:''}
       <div class="grow"></div>
-      <div class="search" style="width:260px">${svg(I.search)}<input placeholder="Tìm proxy..."></div>
+      <div class="search" style="width:240px">${svg(I.search)}<input id="prxQ" value="${esc(STATE.prxQ||'')}" oninput="searchPrx(this.value)" placeholder="Tìm IP / quốc gia..."></div>
     </div>
-    ${sel.size?`<div class="toolbar" style="margin-top:-6px;align-items:center">
-      <span class="dim"><b style="color:var(--primary)">${sel.size}</b> đã chọn</span>
-      <button class="btn ghost-pink" onclick="checkSelectedPrx()">${svg(I.play)}Kiểm tra đã chọn</button>
-      <button class="btn" onclick="togglePrxAll(false)">Bỏ chọn</button></div>`:''}
+    ${all.length?`<div class="toolbar" style="margin-top:-4px;align-items:center">
+      <div class="seg">${fbtn('all','Tất cả',all.length)}${fbtn('alive','Sống',cAlive)}${fbtn('dead','Chết',cDead)}${fbtn('unchecked','Chưa KT',cUn)}</div>
+      <button class="btn sm ${sk==='latency'?'ghost-pink':''}" onclick="sortPrx('latency')">${svg(I.up)}Độ trễ${sic('latency')}</button>
+      <div class="grow"></div>
+      ${sel.size?`<span class="dim"><b style="color:var(--primary)">${sel.size}</b> chọn</span>
+        <button class="btn sm ghost-pink" onclick="checkSelectedPrx()">${svg(I.play)}Kiểm tra đã chọn</button>
+        <button class="btn sm" onclick="togglePrxAll(false)">Bỏ chọn</button>`:''}</div>`:''}
     <div class="card"><table>
-      <thead><tr><th style="width:36px"><input type="checkbox" class="chk" ${allSel?'checked':''} onchange="togglePrxAll(this.checked)"></th><th>IP:Port</th><th>Quốc gia / Exit IP</th><th>Loại</th><th>Độ trễ</th><th>Trạng thái</th><th style="text-align:right">Thao tác</th></tr></thead>
+      <thead><tr><th style="width:36px"><input type="checkbox" class="chk" ${allSel?'checked':''} onchange="togglePrxAll(this.checked)"></th><th>IP:Port</th><th>Quốc gia / Exit IP</th><th>Loại</th><th style="cursor:pointer" onclick="sortPrx('latency')">Độ trễ${sic('latency')}</th><th style="cursor:pointer" onclick="sortPrx('status')">Trạng thái${sic('status')}</th><th style="text-align:right">Thao tác</th></tr></thead>
       <tbody>${rows}</tbody></table>
-      <div class="pager2"><div class="grow"></div><span>Tổng số <b>${list.length}</b> proxy</span></div></div>`;
+      <div class="pager2"><div class="grow"></div><span>Hiển thị <b>${view.length}</b>/${all.length} proxy</span></div></div>`;
 }
+function _prxView(){const q=(STATE.prxQ||'').toLowerCase(),f=STATE.prxFilter||'all';
+  return STATE.proxies.filter(x=>{const m=x.meta||{};
+    if(f==='alive'&&m.alive!==true)return false;
+    if(f==='dead'&&m.alive!==false)return false;
+    if(f==='unchecked'&&m.alive!=null)return false;
+    if(q&&!((x.raw_proxy||'').toLowerCase().includes(q)||String(m.country||'').toLowerCase().includes(q)))return false;
+    return true;});}
+function filterPrx(f){STATE.prxFilter=f;render();}
+function sortPrx(k){const s=STATE.prxSort=STATE.prxSort||{key:null,dir:1};if(s.key===k)s.dir=-s.dir;else{s.key=k;s.dir=1;}render();}
+function searchPrx(v){STATE.prxQ=v;render();const e=document.getElementById('prxQ');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}}
 
 const PROXY_VENDORS=[
   {n:'9Proxy',w:'https://9proxy.com',c:'#7c3aed'},
@@ -1435,7 +1460,7 @@ async function checkProxies(ids){
 function checkSelectedPrx(){return checkProxies([...(STATE.prxSel||new Set())]);}
 function checkAllPrx(){return checkProxies(STATE.proxies.map(p=>p.id));}
 function togglePrxSel(id,on){STATE.prxSel=STATE.prxSel||new Set();on?STATE.prxSel.add(id):STATE.prxSel.delete(id);if(STATE.view==='proxy')render();}
-function togglePrxAll(on){STATE.prxSel=STATE.prxSel||new Set();if(on)STATE.proxies.forEach(p=>STATE.prxSel.add(p.id));else STATE.prxSel.clear();if(STATE.view==='proxy')render();}
+function togglePrxAll(on){STATE.prxSel=STATE.prxSel||new Set();if(on)_prxView().forEach(p=>STATE.prxSel.add(p.id));else STATE.prxSel.clear();if(STATE.view==='proxy')render();}
 
 /* ================= CREATE / EDIT MODAL ================= */
 let CT={tab:"nhanh",proxyChk:""};
