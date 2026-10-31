@@ -17,6 +17,7 @@ validate_script() thuần (test được không cần browser). run_script() n�
 from __future__ import annotations
 
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -222,13 +223,14 @@ def inject_cookies(ws_endpoint: str, cookies: list[dict], *, engine: str = "chro
 
 class _Ctx:
     """Trạng thái chạy: biến, log, data, workdir, trình duyệt + chặn vòng lặp vô hạn."""
-    def __init__(self, browser: Any, page: Any, workdir: Path, timeout: int):
+    def __init__(self, browser: Any, page: Any, workdir: Path, timeout: int, max_seconds: int = 600):
         self.browser, self.page, self.workdir, self.timeout = browser, page, workdir, timeout
         self.vars: dict[str, Any] = {}
         self.log: list[str] = []
         self.data: dict[str, Any] = {}
         self.count = 0
         self.max_steps = 200_000           # ponytail: trần chống loop vô hạn; nâng nếu cần script dài
+        self.deadline = (time.monotonic() + max_seconds) if max_seconds else None  # trần thời gian cả kịch bản
 
 
 class _Stop(Exception):
@@ -252,6 +254,8 @@ def _run_steps(steps: list[dict], ctx: _Ctx) -> None:
         ctx.count += 1
         if ctx.count > ctx.max_steps:
             raise RuntimeError("vượt trần số step (vòng lặp vô hạn?)")
+        if ctx.deadline and time.monotonic() > ctx.deadline:   # trần thời gian tổng (captcha/wait treo lâu)
+            raise RuntimeError("vượt thời gian tối đa của kịch bản")
         act = s["action"]
         # --- control-flow ---
         if act == "comment":
@@ -581,7 +585,7 @@ def fetch_recording(ws_endpoint: str, *, engine: str = "chromium") -> list[dict]
 
 
 def run_script(ws_endpoint: str, steps: list[dict], *, engine: str = "chromium",
-               workdir: str | Path = ".", default_timeout: int = 20000) -> dict:
+               workdir: str | Path = ".", default_timeout: int = 20000, max_seconds: int = 600) -> dict:
     """Nối browser (camoufox=Playwright Firefox, còn lại=CDP Chromium), chạy step. Trả {ok, log[], data{}}."""
     from playwright.sync_api import sync_playwright
     errs = validate_script(steps)
@@ -593,7 +597,7 @@ def run_script(ws_endpoint: str, steps: list[dict], *, engine: str = "chromium",
         bctx = browser.contexts[0] if browser.contexts else browser.new_context()
         page = bctx.pages[0] if bctx.pages else bctx.new_page()
         page.set_default_timeout(default_timeout)
-        ctx = _Ctx(browser, page, workdir, default_timeout)
+        ctx = _Ctx(browser, page, workdir, default_timeout, max_seconds)
         try:
             _run_steps(steps, ctx)
         except _Stop:

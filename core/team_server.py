@@ -150,8 +150,7 @@ def create_team_app(db_path: str | Path) -> Flask:
     def auth(fn):
         @wraps(fn)
         def w(*a, **k):
-            tok = (request.headers.get("Authorization", "").replace("Bearer ", "")
-                   or request.args.get("token", ""))
+            tok = request.headers.get("Authorization", "").replace("Bearer ", "")  # chỉ Bearer header (token qua query -> lọt log)
             u = store.user_for_token(tok)
             if not u:
                 return _err("unauthorized", 401)

@@ -7,7 +7,9 @@ Kèm UI quản profile tại http://127.0.0.1:19996/ (phần B — dùng web she
 """
 from __future__ import annotations
 
+import base64
 import json
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,49 @@ from . import brand, browser_profiles, engines, proxy_providers
 from . import scheduler as scheduler_mod
 from .db import Database
 from .fingerprint import generate
+
+# ---- Mã hoá bí mật at-rest bằng Windows DPAPI (theo tài khoản Windows, không cần quản khoá) ----
+_SECRET_KEYS = ("ai_key", "team_token")   # field nhạy cảm trong settings.json -> mã hoá khi lưu
+_ENC_PREFIX = "dpapi:"
+
+
+def _dpapi(data: bytes, *, encrypt: bool) -> bytes | None:
+    """CryptProtectData/CryptUnprotectData. None nếu không phải Windows hoặc lỗi -> caller giữ plaintext."""
+    if os.name != "nt":
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class _BLOB(ctypes.Structure):
+            _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+        fn = (ctypes.windll.crypt32.CryptProtectData if encrypt
+              else ctypes.windll.crypt32.CryptUnprotectData)
+        blob_in = _BLOB(len(data), ctypes.cast(ctypes.c_char_p(data), ctypes.POINTER(ctypes.c_char)))
+        blob_out = _BLOB()
+        if not fn(ctypes.byref(blob_in), None, None, None, None, 0, ctypes.byref(blob_out)):
+            return None
+        try:
+            return ctypes.string_at(blob_out.pbData, blob_out.cbData)
+        finally:
+            ctypes.windll.kernel32.LocalFree(blob_out.pbData)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _enc_secret(v: str) -> str:
+    if not v or v.startswith(_ENC_PREFIX):
+        return v
+    out = _dpapi(v.encode("utf-8"), encrypt=True)
+    return _ENC_PREFIX + base64.b64encode(out).decode() if out else v   # DPAPI lỗi -> giữ nguyên (không mất dữ liệu)
+
+
+def _dec_secret(v: str) -> str:
+    if not v or not v.startswith(_ENC_PREFIX):
+        return v
+    out = _dpapi(base64.b64decode(v[len(_ENC_PREFIX):]), encrypt=False)
+    return out.decode("utf-8") if out else v
 
 DEFAULT_PORT = brand.DEFAULT_PORT
 _UI_DIR = Path(__file__).resolve().parent.parent / "ui"
@@ -116,13 +161,20 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             s.update(json.loads(_settings_file.read_text(encoding="utf-8")))
         except Exception:  # noqa: BLE001
             pass
+        for k in _SECRET_KEYS:                          # giải mã bí mật để app dùng (ai.py/TeamClient cần plaintext)
+            if s.get(k):
+                s[k] = _dec_secret(s[k])
         return s
 
     def _save_settings(patch: dict) -> dict:
         s = _load_settings()
         s.update({k: v for k, v in patch.items() if k in _DEFAULT_SETTINGS})
+        on_disk = dict(s)
+        for k in _SECRET_KEYS:                          # mã hoá bí mật trước khi ghi file (không lưu plaintext)
+            if on_disk.get(k):
+                on_disk[k] = _enc_secret(on_disk[k])
         try:
-            _settings_file.write_text(json.dumps(s, ensure_ascii=False, indent=2), encoding="utf-8")
+            _settings_file.write_text(json.dumps(on_disk, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:  # noqa: BLE001
             pass
         return s
