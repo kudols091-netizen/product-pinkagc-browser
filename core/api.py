@@ -954,16 +954,36 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         if not p:
             return _err("profile not found", 404)
         import io
+        import ipaddress
         import shutil
+        import socket
         import urllib.request
         import zipfile
+        from urllib.parse import urlparse
+        _MAX_DL = 100 * 1024 * 1024        # trần tải về 100MB
+        _MAX_UNZIP = 300 * 1024 * 1024     # trần tổng dung lượng sau giải nén (chống zip-bomb)
         b = request.get_json(silent=True) or {}
         src = (b.get("path") or "").strip()
         url = (b.get("url") or "").strip()
         try:
             if url:
+                u = urlparse(url)                              # chống SSRF: chỉ http/https, host không nội bộ
+                if u.scheme not in ("http", "https") or not u.hostname:
+                    return _err("URL không hợp lệ (chỉ http/https)")
+                try:
+                    _ips = {ai[4][0] for ai in socket.getaddrinfo(u.hostname, None)}
+                except Exception:  # noqa: BLE001
+                    return _err("không phân giải được tên miền")
+                for _ip in _ips:
+                    _a = ipaddress.ip_address(_ip)
+                    if (_a.is_private or _a.is_loopback or _a.is_link_local
+                            or _a.is_reserved or _a.is_multicast or _a.is_unspecified):
+                        return _err("URL trỏ vào địa chỉ nội bộ — từ chối (chống SSRF)")
                 req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                data = urllib.request.urlopen(req, timeout=30).read()      # noqa: S310 — user dán URL
+                with urllib.request.urlopen(req, timeout=30) as _r:        # noqa: S310 — đã lọc host nội bộ
+                    data = _r.read(_MAX_DL + 1)
+                if len(data) > _MAX_DL:
+                    return _err("file tải về quá lớn (>100MB)")
                 name = (url.rstrip("/").split("/")[-1] or "ext").split("?")[0]
             elif src:
                 if not Path(src).is_file():
@@ -980,9 +1000,12 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         name = "".join(c for c in name if c.isalnum() or c in "-_") or "ext"
         dest = Path(profiles_root).parent / "extensions" / pid / name
         try:
+            zf = zipfile.ZipFile(io.BytesIO(data[i:]))
+            if sum(zi.file_size for zi in zf.infolist()) > _MAX_UNZIP:   # chống zip-bomb
+                return _err("gói giải nén quá lớn (>300MB) — nghi zip-bomb")
             shutil.rmtree(dest, ignore_errors=True)
             dest.mkdir(parents=True, exist_ok=True)
-            zipfile.ZipFile(io.BytesIO(data[i:])).extractall(dest)
+            zf.extractall(dest)
         except Exception as e:  # noqa: BLE001
             return _err(f"giải nén lỗi: {e}")
         if not (dest / "manifest.json").is_file():   # có khi lồng 1 cấp

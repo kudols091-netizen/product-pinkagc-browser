@@ -294,17 +294,22 @@ def _run_steps(steps: list[dict], ctx: _Ctx) -> None:
             continue
         # --- leaf: có retry ---
         tries = int(s.get("retry", 0) or 0) + 1
-        if s.get("timeout"):
-            page.set_default_timeout(int(s["timeout"]))
-        for attempt in range(tries):
-            try:
-                _exec_leaf(s, ctx, i); break
-            except Exception as e:  # noqa: BLE001
-                if attempt + 1 >= tries:
-                    raise
-                ctx.log.append(f"step {i} retry {attempt + 1}: {e}")
-        else:
-            continue
+        _step_to = s.get("timeout")
+        if _step_to:
+            page.set_default_timeout(int(_step_to))        # timeout riêng cho step này
+        try:
+            for attempt in range(tries):
+                try:
+                    _exec_leaf(s, ctx, i); break
+                except Exception as e:  # noqa: BLE001
+                    if attempt + 1 >= tries:
+                        raise
+                    ctx.log.append(f"step {i} retry {attempt + 1}: {e}")
+            else:
+                continue
+        finally:
+            if _step_to:
+                page.set_default_timeout(ctx.timeout)      # khôi phục mặc định -> không rò sang step sau
         ctx.log.append(f"step {i} ok: {act}")
 
 
