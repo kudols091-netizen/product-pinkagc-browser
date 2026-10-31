@@ -78,12 +78,15 @@ def main() -> None:
     print(f"{brand.APP_NAME} v{brand.VERSION}\n{URL}")
     win = _open_window()
     if win is not None:
+        t0 = time.monotonic()
         try:
             win.wait()                                   # đóng cửa sổ app -> thoát cả app (không để server treo nền)
         except KeyboardInterrupt:
             pass
-        os._exit(0)
-    try:                                                 # fallback: không có trình duyệt shell -> mở tab mặc định
+        if time.monotonic() - t0 >= 3:                   # cửa sổ sống đủ lâu -> user chủ động đóng -> thoát app
+            os._exit(0)
+        # thoát <3s = Edge uỷ cho instance sẵn có (không host cửa sổ của ta) -> giữ server + mở tab thường
+    try:                                                 # fallback: không có shell / cửa sổ không host được -> tab mặc định
         webbrowser.open(URL)
     except Exception:
         pass
