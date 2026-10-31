@@ -157,6 +157,19 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             log_event("stop", f"Đóng profile {pid[:8]}")
         return {"id": pid, "stopped": bool(item)}
 
+    def _prune_dead() -> None:
+        """Gỡ profile mà tiến trình trình duyệt đã thoát (user bấm X đóng cửa sổ tay) khỏi `running`,
+        để status quay về 'sẵn sàng' thay vì kẹt 'đang chạy'. Gọi trước mỗi lần liệt kê/báo status."""
+        for pid in list(running):
+            h = running[pid][0]
+            proc = getattr(h, "proc", h)   # RelayHandle/_CamoufoxHandle -> .proc; ovobrowser/botbrowser -> Popen
+            try:
+                dead = proc.poll() is not None
+            except Exception:              # noqa: BLE001 — không poll được -> coi như còn chạy (an toàn)
+                continue
+            if dead:
+                _stop_one(pid)             # dọn relay + ghi log "Đóng profile"
+
     def _run_profile_script(pid: str, steps: list, *, engine: str | None = None,
                             headless: bool = True, script_name: str = "",
                             source: str = "manual") -> dict:
@@ -201,6 +214,7 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
     # ---- profiles ----
     @app.get("/api/v3/profiles")
     def list_profiles():
+        _prune_dead()
         return _ok([{
             "id": p.id, "name": p.name, "group_id": p.group_id,
             "os": (p.fingerprint_data.get("os", {}) or {}).get("type"),
@@ -310,10 +324,12 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
 
     @app.get("/api/v1/status")
     def gpm_status():
+        _prune_dead()
         return _gpm_ok({"app": brand.APP_NAME, "version": brand.VERSION, "running": list(running)})
 
     @app.get("/api/v1/profiles")
     def gpm_profiles():
+        _prune_dead()
         rows = [{"id": p.id, "name": p.name, "group": p.group_id,
                  "status": "running" if p.id in running else "stopped"} for p in db.list_profiles()]
         return _gpm_ok({"profiles": rows, "total": len(rows)})
