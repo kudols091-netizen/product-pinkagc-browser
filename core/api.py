@@ -653,12 +653,26 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
     # ---- Engines (đa-version: built-in + tải thêm theo yêu cầu) ----
     @app.get("/api/v3/engines")
     def engines_list():
+        import os as _os
         from . import engine_store
         installed = engine_store.list_installed()
         iv = {e["version"] for e in installed}
         cat = engine_store.fetch_catalog(_load_settings().get("engines_url", ""))
         available = [c for c in cat if c.get("version") not in iv]
+        def _cam_ok():
+            try:
+                import camoufox  # noqa: F401
+                return True
+            except Exception:  # noqa: BLE001
+                return False
+        engine_types = {                              # engine nào chạy được ngay (binary/thư viện đã có)
+            "ovobrowser": bool(_os.environ.get("OVOBROWSER_BIN")),
+            "fpchromium": bool(_os.environ.get("FPCHROMIUM_BIN")),
+            "botbrowser": bool(_os.environ.get("BOTBROWSER_BIN")),
+            "camoufox": _cam_ok(),
+        }
         return _ok({"installed": installed, "available": available,
+                    "engine_types": engine_types,
                     "status": engine_store.download_status()})
 
     @app.post("/api/v3/engines/download")

@@ -475,12 +475,12 @@ function refresh(){load().then(render);}
 /* ---------- data ---------- */
 async function load(){
   try{
-    const[p,px,bs,pr,gr]=await Promise.all([
+    const[p,px,bs,pr,gr,en]=await Promise.all([
       j(`${API}/profiles`), j(`${API}/proxies`).catch(()=>[]),
       j(`${API}/browsers`).catch(()=>[]), j(`${API}/proxy/providers`).catch(()=>[]),
-      j(`${API}/groups`).catch(()=>[]),
+      j(`${API}/groups`).catch(()=>[]), j(`${API}/engines`).catch(()=>null),
     ]);
-    STATE.profiles=p;STATE.proxies=px;STATE.browsers=bs;STATE.providers=pr;STATE.groups=gr;
+    STATE.profiles=p;STATE.proxies=px;STATE.browsers=bs;STATE.providers=pr;STATE.groups=gr;if(en)STATE.engines=en;
   }catch(e){toast("Không kết nối backend: "+e.message,"err");}
 }
 
@@ -1553,7 +1553,7 @@ function createTab(bro){
       </div>
       <div style="flex:1"><label>OS</label><select id="cOs" onchange="updateSum()"><option>Windows</option><option>macOS</option><option>Linux</option></select></div>
     </div>
-    <div class="field" style="margin-top:16px"><label>Engine</label><select id="cEngine"><option value="">auto (Chromium→ovobrowser)</option><option value="ovobrowser">ovobrowser (Chrome, khuyến nghị)</option><option value="camoufox">camoufox (Firefox)</option><option value="fpchromium">fpchromium</option><option value="botbrowser">botbrowser (premium)</option></select></div>
+    <div class="field" style="margin-top:16px"><label>Engine</label><select id="cEngine">${(()=>{const et=(STATE.engines&&STATE.engines.engine_types)||{};const o=(v,lb,k)=>{const off=k&&et[k]===false;return `<option value="${v}" ${off?'disabled':''}>${lb}${off?' — chưa cấu hình':''}</option>`;};return o('','auto (tự chọn engine khả dụng)',null)+o('ovobrowser','ovobrowser (Chrome, khuyến nghị)','ovobrowser')+o('camoufox','camoufox (Firefox)','camoufox')+o('fpchromium','fpchromium','fpchromium')+o('botbrowser','botbrowser (premium)','botbrowser');})()}</select></div>
     <div class="field"><label>URL khởi động</label><input id="cUrl" placeholder="https://example.com"></div>
     <div class="field"><label>Proxy</label>
       ${STATE.proxies.length?`<select id="cProxyLib" onchange="cPickLib(this.value)" style="margin-bottom:8px"><option value="">— chọn từ thư viện (${STATE.proxies.length} proxy đã lưu) —</option>${STATE.proxies.map(x=>{const m=x.meta||{};const dot=m.alive?'🟢':(m.alive===false?'🔴':'⚪');return `<option value="${esc(x.raw_proxy)}">${dot} ${esc((x.raw_proxy||'').split('://').pop())}${m.country?' · '+esc(m.country):''}${m.latency_ms!=null?' · '+m.latency_ms+'ms':''}</option>`;}).join("")}</select>`:''}

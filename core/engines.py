@@ -108,7 +108,11 @@ def resolve_engine(profile: Profile, requested: str | None) -> str:
         return requested
     saved = (profile.dynamic_data or {}).get("engine")
     if saved:
-        return saved
+        # engine đã lưu nhưng binary chưa cấu hình -> rơi về auto (tránh "launch failed", mở bằng engine khả dụng)
+        _need = {"ovobrowser": "OVOBROWSER_BIN", "fpchromium": "FPCHROMIUM_BIN", "botbrowser": "BOTBROWSER_BIN"}
+        env = _need.get(saved)
+        if not env or os.environ.get(env):
+            return saved
     btype = ((profile.fingerprint_data or {}).get("browser", {}) or {}).get("browser_type", "Chrome")
     if browser_profiles.identity(btype).kind == "firefox":
         return "camoufox"
