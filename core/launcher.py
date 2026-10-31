@@ -86,12 +86,17 @@ _CAMO_CODE = (
     "    threading.Thread(target=_wait_stdin, daemon=True).start()\n"
     "    try: b.on('close', lambda *a: stop.set())\n"   # context đóng -> dừng
     "    except Exception: pass\n"
+    "    fails=0\n"
     "    while not stop.is_set():\n"
     "        try:\n"
     "            ps=b.pages\n"              # .pages là cache (không round-trip) -> phải ping thật bên dưới
     "            if not ps: break\n"
-    "            ps[0].evaluate('1')\n"     # round-trip: user đóng cửa sổ -> Firefox chết -> ném lỗi -> thoát
-    "        except Exception: break\n"
+    "            ps[0].evaluate('1'); fails=0\n"   # round-trip: Firefox chết -> ném lỗi
+    "        except Exception as e:\n"
+    "            m=str(e).lower()\n"
+    "            if ('closed' in m) or ('disconnect' in m) or ('crash' in m): break\n"  # thật sự chết -> thoát
+    "            fails+=1\n"               # lỗi tạm (đang điều hướng: 'execution context destroyed') -> BỎ QUA
+    "            if fails>=6: break\n"      # chỉ coi là chết khi fail liên tục ~3s (tránh đóng nhầm cửa sổ đang dùng)
     "        time.sleep(0.5)\n"
 )
 
