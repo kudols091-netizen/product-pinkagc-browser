@@ -586,6 +586,20 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         except Exception as e:  # noqa: BLE001
             return _err(f"không mở được hộp chọn file: {e}", 500)
 
+    @app.post("/api/v3/pick-folder")
+    def pick_folder():
+        """Mở hộp chọn THƯ MỤC native (Windows) → trả đường dẫn (cho extension unpacked)."""
+        import subprocess
+        ps = ("Add-Type -AssemblyName System.Windows.Forms;"
+              "$f=New-Object System.Windows.Forms.FolderBrowserDialog;$f.Description='Chon thu muc';"
+              "if($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){Write-Output $f.SelectedPath}")
+        try:
+            out = subprocess.run(["powershell", "-NoProfile", "-STA", "-Command", ps],
+                                 capture_output=True, text=True, timeout=180)
+            return _ok({"path": out.stdout.strip()})
+        except Exception as e:  # noqa: BLE001
+            return _err(f"không mở được hộp chọn thư mục: {e}", 500)
+
     def _find_ffmpeg() -> str | None:
         import shutil
         f = shutil.which("ffmpeg")
@@ -863,6 +877,59 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         dyn["extensions"] = [e for e in (dyn.get("extensions") or []) if e != path]
         db.set_dynamic_data(pid, dyn)
         return _ok({"id": pid, "extensions": dyn["extensions"]})
+
+    @app.post("/api/v3/profiles/<pid>/extensions/from-archive")
+    def ext_from_archive(pid: str):
+        """Nạp extension từ file .crx/.zip (path) hoặc URL -> giải nén ra asset/extensions/<pid>/<name> rồi đăng ký."""
+        p = db.get_profile(pid)
+        if not p:
+            return _err("profile not found", 404)
+        import io
+        import shutil
+        import urllib.request
+        import zipfile
+        b = request.get_json(silent=True) or {}
+        src = (b.get("path") or "").strip()
+        url = (b.get("url") or "").strip()
+        try:
+            if url:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                data = urllib.request.urlopen(req, timeout=30).read()      # noqa: S310 — user dán URL
+                name = (url.rstrip("/").split("/")[-1] or "ext").split("?")[0]
+            elif src:
+                if not Path(src).is_file():
+                    return _err("file không tồn tại")
+                data = Path(src).read_bytes()
+                name = Path(src).stem
+            else:
+                return _err("thiếu path hoặc url")
+        except Exception as e:  # noqa: BLE001
+            return _err(f"không tải/đọc được: {e}")
+        i = data.find(b"PK\x03\x04")                 # .crx = header + zip; tìm điểm bắt đầu zip
+        if i < 0:
+            return _err("không phải file .crx/.zip hợp lệ")
+        name = "".join(c for c in name if c.isalnum() or c in "-_") or "ext"
+        dest = Path(profiles_root).parent / "extensions" / pid / name
+        try:
+            shutil.rmtree(dest, ignore_errors=True)
+            dest.mkdir(parents=True, exist_ok=True)
+            zipfile.ZipFile(io.BytesIO(data[i:])).extractall(dest)
+        except Exception as e:  # noqa: BLE001
+            return _err(f"giải nén lỗi: {e}")
+        if not (dest / "manifest.json").is_file():   # có khi lồng 1 cấp
+            subs = [d for d in dest.iterdir() if d.is_dir() and (d / "manifest.json").is_file()]
+            if subs:
+                dest = subs[0]
+            else:
+                return _err("gói thiếu manifest.json (không phải extension hợp lệ)")
+        dyn = p.dynamic_data or {}
+        exts = dyn.get("extensions") or []
+        ds = str(dest)
+        if ds not in exts:
+            exts.append(ds)
+        dyn["extensions"] = exts
+        db.set_dynamic_data(pid, dyn)
+        return _ok({"id": pid, "extensions": exts, "folder": ds})
 
     @app.get("/api/v3/browsers")
     def browser_options():

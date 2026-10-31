@@ -654,7 +654,14 @@ function viewProxy(){
         <button class="btn sm ghost-pink" ${x._checking?'disabled':''} onclick="checkPrx('${x.id}')">${svg(I.play)}Kiểm tra</button>
         <button class="btn sm" onclick="delPrx('${x.id}')">🗑</button></div></td></tr>`;}).join("")
     : `<tr><td colspan="7"><div class="empty"><h3>Chưa có proxy</h3><p>Bấm <b>Thêm proxy</b>. Hỗ trợ dán trần — tự nhận http/socks5.</p></div></td></tr>`;
-  return `<div class="phead"><h1>Quản lý <em>Proxy</em></h1><p>Thêm, kiểm tra và quản lý danh sách proxy để dùng cho profile.</p></div>
+  STATE.proxyTab=STATE.proxyTab||'manage';
+  const head=`<div class="phead"><h1>Quản lý <em>Proxy</em></h1><p>Thêm, kiểm tra và quản lý danh sách proxy để dùng cho profile.</p></div>
+    <div class="tabs" style="margin-bottom:18px">
+      <button class="${STATE.proxyTab==='manage'?'on':''}" onclick="STATE.proxyTab='manage';render()">Quản lý proxy</button>
+      <button class="${STATE.proxyTab==='buy'?'on':''}" onclick="STATE.proxyTab='buy';render()">Mua proxy giá tốt</button>
+    </div>`;
+  if(STATE.proxyTab==='buy')return head+viewProxyBuy();
+  return head+`
     <div class="toolbar">
       <button class="btn pri" onclick="addPrx()">${svg(I.plus)}Thêm proxy</button>
       <button class="btn" onclick="addPrx()">${svg(I.up)}Import hàng loạt</button>
@@ -670,6 +677,27 @@ function viewProxy(){
       <thead><tr><th style="width:36px"><input type="checkbox" class="chk" ${allSel?'checked':''} onchange="togglePrxAll(this.checked)"></th><th>IP:Port</th><th>Quốc gia / Exit IP</th><th>Loại</th><th>Độ trễ</th><th>Trạng thái</th><th style="text-align:right">Thao tác</th></tr></thead>
       <tbody>${rows}</tbody></table>
       <div class="pager2"><div class="grow"></div><span>Tổng số <b>${list.length}</b> proxy</span></div></div>`;
+}
+
+const PROXY_VENDORS=[
+  {n:'9Proxy',w:'https://9proxy.com',c:'#7c3aed'},
+  {n:'ProxyNo1',w:'https://proxyno1.com',c:'#2563eb'},
+  {n:'TinProxy',w:'https://tinproxy.com',c:'#3b82f6'},
+  {n:'MProxy',w:'https://mproxy.vn',c:'#0ea5e9'},
+  {n:'KiotProxy',w:'https://kiotproxy.com',c:'#14b8a6'},
+  {n:'Thordata',w:'https://www.thordata.com',c:'#ec4899'},
+  {n:'Floppydata',w:'https://floppydata.com',c:'#8b5cf6'},
+  {n:'IPRoyal',w:'https://iproyal.com',c:'#f59e0b'},
+  {n:'Bright Data',w:'https://brightdata.com',c:'#22c55e'},
+  {n:'Oxylabs',w:'https://oxylabs.io',c:'#0891b2'},
+];
+function viewProxyBuy(){
+  const rows=PROXY_VENDORS.map(v=>`<tr>
+    <td><span style="display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;background:${v.c};color:#fff;font-weight:700;vertical-align:middle;margin-right:10px">${esc(v.n[0])}</span><b>${esc(v.n)}</b></td>
+    <td><a href="${esc(v.w)}" target="_blank" rel="noopener" style="color:var(--primary)">${esc(v.w)}</a></td>
+    <td style="text-align:right"><a href="${esc(v.w)}" target="_blank" rel="noopener" class="btn sm pri" style="text-decoration:none">Mua ngay</a></td></tr>`).join("");
+  return `<div class="hint" style="background:#fff8e6;border-color:#f3e0a8;color:#8a6d1a;margin-bottom:16px">⚠️ <b>Lưu ý</b>: danh sách nhà cung cấp proxy tham khảo (bên thứ ba). PinkAgc không đảm bảo chất lượng dài hạn — hãy mua số lượng nhỏ để thử trước khi chạy quy mô lớn.</div>
+    <div class="card"><table><thead><tr><th>Nhà cung cấp</th><th>Website</th><th style="text-align:right">Thao tác</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 /* ----- Trash ----- */
@@ -932,13 +960,23 @@ function viewExtensions(){
    <div class="toolbar">
      <label style="margin:0">Profile:</label>
      <select id="extProf" style="width:240px" onchange="loadExts()">${opts||'<option>— chưa có profile —</option>'}</select>
-     <button class="btn pri" onclick="addExt()">${svg(I.plus)}Thêm extension</button>
+     <div class="kebab">
+       <button class="btn pri" onclick="toggleKebab(this)">${svg(I.plus)}Thêm extension</button>
+       <div class="kmenu" style="left:0;right:auto">
+         <button onclick="extAddUrl()">${svg(I.globe)} Từ URL (.crx/.zip)</button>
+         <button onclick="extAddFile()">${svg(I.dl)} Từ file (.crx, .zip)</button>
+         <button onclick="extAddFolder()">${svg(I.folder)} Từ thư mục (unpacked)</button>
+       </div>
+     </div>
      <span class="dim" style="font-size:12.5px;margin-left:auto">Extension áp dụng ở <b>lần mở profile tiếp theo</b>.</span>
    </div>
    <div class="card"><table><thead><tr><th>Extension</th><th style="text-align:right">Thao tác</th></tr></thead><tbody id="extBody"><tr><td colspan="2" class="dim" style="padding:22px">Chọn profile để xem.</td></tr></tbody></table></div>`;
 }
 async function loadExts(){const id=document.getElementById("extProf")?.value;if(!id)return;try{const l=await j(`${API}/profiles/${id}/extensions`);document.getElementById("extBody").innerHTML=l.length?l.map(p=>{const nm=String(p).replace(/[\\/]+$/,"").split(/[\\/]/).pop()||p;return `<tr><td><div class="pcell"><b>${esc(nm)}</b><div class="psub mono" title="${esc(p)}">${esc(p)}</div></div></td><td><div class="rowact"><button class="btn sm" onclick="delExt('${id}','${encodeURIComponent(p)}')" title="Gỡ">🗑</button></div></td></tr>`;}).join(""):`<tr><td colspan="2" class="dim" style="padding:22px">Chưa có extension. Bấm <b>Thêm extension</b>.</td></tr>`;}catch(e){toast(e.message,"err");}}
-async function addExt(){const id=document.getElementById("extProf")?.value;if(!id)return toast("Chưa có profile","err");const path=prompt("Đường dẫn thư mục extension (đã giải nén / unpacked):");if(!path)return;try{await j(`${API}/profiles/${id}/extensions`,body({path:path.trim()}));toast("Đã thêm extension (áp dụng lần Mở tới)","ok");loadExts();}catch(e){toast(e.message,"err");}}
+function extCurId(){const id=document.getElementById("extProf")?.value;if(!id){toast("Chưa có profile","err");return null;}return id;}
+async function extAddUrl(){const id=extCurId();if(!id)return;const url=prompt("Dán URL file extension (.crx/.zip):");if(!url)return;toast("Đang tải + giải nén…","");try{const d=await j(`${API}/profiles/${id}/extensions/from-archive`,body({url:url.trim()}));toast("Đã thêm extension (áp dụng lần Mở tới)","ok");loadExts();}catch(e){toast(e.message,"err");}}
+async function extAddFile(){const id=extCurId();if(!id)return;try{const r=await j(`${API}/pick-file`,body({filter:"Extension (*.crx;*.zip)|*.crx;*.zip|All files|*.*"}));if(!r.path)return;toast("Đang giải nén…","");await j(`${API}/profiles/${id}/extensions/from-archive`,body({path:r.path}));toast("Đã thêm extension","ok");loadExts();}catch(e){toast(e.message,"err");}}
+async function extAddFolder(){const id=extCurId();if(!id)return;try{const r=await j(`${API}/pick-folder`,body({}));if(!r.path)return;await j(`${API}/profiles/${id}/extensions`,body({path:r.path}));toast("Đã thêm extension (áp dụng lần Mở tới)","ok");loadExts();}catch(e){toast(e.message,"err");}}
 async function delExt(id,p){try{await j(`${API}/profiles/${id}/extensions?path=${p}`,{method:"DELETE"});toast("Đã gỡ");loadExts();}catch(e){toast(e.message,"err");}}
 
 /* ----- Settings ----- */
