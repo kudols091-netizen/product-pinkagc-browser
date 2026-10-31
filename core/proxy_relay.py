@@ -30,7 +30,21 @@ def _retry(fn, attempts: int = 3, backoff: float = 0.3):
     raise last                               # type: ignore[misc]
 
 
+def _nodelay(s: socket.socket) -> None:
+    """Tắt Nagle + nới buffer -> gói nhỏ (TLS handshake, click, AJAX) đi ngay, bớt giật/trễ."""
+    try:
+        s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    except OSError:
+        pass
+    for opt in (socket.SO_RCVBUF, socket.SO_SNDBUF):
+        try:
+            s.setsockopt(socket.SOL_SOCKET, opt, 262144)      # 256KB: throughput tốt hơn cho ảnh/video
+        except OSError:
+            pass
+
+
 def _pipe(a: socket.socket, b: socket.socket) -> None:
+    _nodelay(a); _nodelay(b)
     conns = [a, b]
     try:
         while True:
@@ -90,6 +104,7 @@ class ProxyRelay:
             threading.Thread(target=self._handle, args=(cli,), daemon=True).start()
 
     def _handle(self, cli: socket.socket) -> None:
+        _nodelay(cli)
         try:
             head = b""
             while b"\r\n\r\n" not in head:
