@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import glob
 import os
+import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -38,6 +40,31 @@ def _serve() -> None:
     create_app(brand.DEFAULT_DB, "asset/profiles").run(host="127.0.0.1", port=PORT, threaded=True)
 
 
+def _find_shell() -> str | None:
+    """Trình duyệt để host cửa sổ app (--app mode). Ưu tiên Edge (luôn có trên Win10/11) -> shell
+    tách biệt engine antidetect; fallback chromium gói sẵn. None -> mở tab trình duyệt mặc định."""
+    for c in (os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+              os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe")):
+        if c and os.path.isfile(c):
+            return c
+    return shutil.which("msedge") or shutil.which("chrome") or os.environ.get("OVOBROWSER_BIN")
+
+
+def _open_window() -> "subprocess.Popen | None":
+    """Mở UI như CỬA SỔ APP riêng (chromeless). user-data-dir riêng -> không dùng chung phiên Edge
+    của user, nên tiến trình này sống tới khi đóng cửa sổ (để biết lúc nào thoát app)."""
+    exe = _find_shell()
+    if not exe:
+        return None
+    shell_dir = str(BASE / "asset" / ".uishell")
+    try:
+        return subprocess.Popen([exe, f"--app={URL}", f"--user-data-dir={shell_dir}",
+                                 "--no-first-run", "--no-default-browser-check",
+                                 "--window-size=1320,860"])
+    except Exception:
+        return None
+
+
 def main() -> None:
     t = threading.Thread(target=_serve, daemon=True)
     t.start()
@@ -49,7 +76,14 @@ def main() -> None:
         except Exception:
             time.sleep(0.2)
     print(f"{brand.APP_NAME} v{brand.VERSION}\n{URL}")
-    try:
+    win = _open_window()
+    if win is not None:
+        try:
+            win.wait()                                   # đóng cửa sổ app -> thoát cả app (không để server treo nền)
+        except KeyboardInterrupt:
+            pass
+        os._exit(0)
+    try:                                                 # fallback: không có trình duyệt shell -> mở tab mặc định
         webbrowser.open(URL)
     except Exception:
         pass
