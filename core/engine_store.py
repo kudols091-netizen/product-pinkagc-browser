@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import threading
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -136,15 +137,30 @@ def delete_version(version: str) -> None:
     _progress.pop(version, None)
 
 
-def fetch_catalog(url: str, *, _opener: Callable[..., Any] = urllib.request.urlopen) -> list[dict]:
-    """Manifest {engines:[{version,url,size,sha256?}]} hoặc mảng thẳng. Lỗi -> []."""
+_catalog_cache: dict[str, tuple[float, list[dict]]] = {}   # url -> (hạn, kết quả)
+_CATALOG_TTL = 300        # catalog engine đổi hiếm -> cache 5 phút (/engines gọi mỗi lần refresh UI)
+_CATALOG_TTL_FAIL = 20    # lỗi/offline -> cache ngắn, để online lại là thử ngay
+
+
+def fetch_catalog(url: str, *, _opener: Callable[..., Any] = urllib.request.urlopen,
+                  force: bool = False) -> list[dict]:
+    """Manifest {engines:[{version,url,size,sha256?}]} hoặc mảng thẳng. Lỗi -> [].
+    Cache theo url (TTL) vì /engines bị gọi mỗi lần refresh UI -> không round-trip mạng mỗi lần."""
+    now = time.monotonic()
+    if not force:
+        hit = _catalog_cache.get(url)
+        if hit and now < hit[0]:
+            return hit[1]
     try:
         with _opener(url, timeout=20) as r:  # noqa: S310
             data = json.loads(r.read())
+        engines = data.get("engines") if isinstance(data, dict) else data
+        out = engines if isinstance(engines, list) else []
+        _catalog_cache[url] = (now + _CATALOG_TTL, out)
+        return out
     except Exception:  # noqa: BLE001
+        _catalog_cache[url] = (now + _CATALOG_TTL_FAIL, [])
         return []
-    engines = data.get("engines") if isinstance(data, dict) else data
-    return engines if isinstance(engines, list) else []
 
 
 if __name__ == "__main__":
