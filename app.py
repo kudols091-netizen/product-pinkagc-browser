@@ -20,6 +20,13 @@ BASE = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__
 os.chdir(BASE)
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
+# Bản đóng gói --windowed không có console -> sys.stdout/stderr = None. Vá về devnull để
+# print()/log của Flask không ném lỗi (app chạy nền, không hiện cửa sổ đen như GPM).
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")           # noqa: SIM115
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")           # noqa: SIM115
+
 # Tự dò binary ovobrowser trong vendor/ cạnh app nếu người dùng chưa set OVOBROWSER_BIN.
 if not os.environ.get("OVOBROWSER_BIN"):
     hits = glob.glob(str(BASE / "vendor" / "ovobrowser" / "**" / "chrome.exe"), recursive=True)

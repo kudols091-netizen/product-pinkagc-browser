@@ -10,11 +10,12 @@ if (Test-Path "ui\favicon.ico") { $icon = "--icon=ui\favicon.ico" }
 
 # --add-data "ui;ui": bundle thu muc UI vao .exe (frozen -> _MEIPASS\ui, khop _UI_DIR cua api.py)
 # KHONG bundle vendor\ (4.6GB ovobrowser) va asset\ (du lieu) -> de canh .exe luc phat hanh.
+# --windowed: KHONG hien cua so console den (chay nen nhu GPM); stdout/stderr=None da duoc app.py va.
 # --collect-all playwright: GOI playwright (driver) -> automation + Test fingerprint + inject cookie
 #   chay duoc trong .exe (noi CDP vao ovobrowser, KHONG tai browser rieng cua playwright).
 # --exclude-module: camoufox (Firefox) can binary rieng -> van loai (profile Firefox raise loi co
 #   kiem soat); cv2/numpy/torch (captcha nang) loai de nhe. Engine chinh: ovobrowser/Chromium.
-pyinstaller --noconfirm --onefile --name "PinkAgcBrowser" `
+pyinstaller --noconfirm --onefile --windowed --name "PinkAgcBrowser" `
   $icon `
   --add-data "ui;ui" `
   --hidden-import flask --hidden-import socks `
