@@ -20,3 +20,6 @@ build/_pyi/
 build/*.spec
 *.spec
 build/PinkAgcBrowser/
+
+# Backup migration (an toan lui, khong commit)
+_migration-backup-*/
