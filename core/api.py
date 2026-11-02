@@ -134,7 +134,10 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             return jsonify({"error": "forbidden host"}), 403
 
     db = Database(db_path)
-    profiles_root = str(profiles_root)
+    # TUYỆT ĐỐI hoá: ovobrowser.exe (wrapper portable) resolve --user-data-dir tương đối theo thư mục
+    # CỦA NÓ (vendor\) -> cookie/session profile rơi vào vendor thay vì asset\profiles của app. Ép abspath
+    # để mọi engine ghi đúng chỗ dù cwd con là gì.
+    profiles_root = os.path.abspath(str(profiles_root))
     running: dict[str, tuple[Any, str, str]] = {}   # pid -> (handle, endpoint, engine)
     _rlock = threading.Lock()                        # Flask threaded=True -> khoá mọi đọc/ghi `running`
     _starting: set[str] = set()                      # pid đang serve() dở (chống start trùng -> mồ côi)
