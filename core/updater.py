@@ -30,12 +30,13 @@ def is_frozen() -> bool:
 
 
 def check() -> dict:
-    """So brand.VERSION với manifest UPDATE_URL. Thuần stdlib."""
+    """So brand.VERSION với manifest brand.UPDATE_URL. Thuần stdlib."""
     url = getattr(brand, "UPDATE_URL", "")
     if not url:
         return {"current": brand.VERSION, "has_update": False, "reason": "chưa cấu hình UPDATE_URL"}
     try:
-        with urllib.request.urlopen(url, timeout=6) as r:
+        req = urllib.request.Request(url, headers={"User-Agent": f"PinkAgcBrowser/{brand.VERSION}"})
+        with urllib.request.urlopen(req, timeout=6) as r:
             info = json.loads(r.read().decode("utf-8"))
     except Exception as e:  # noqa: BLE001
         return {"current": brand.VERSION, "has_update": False, "error": str(e)}
@@ -56,7 +57,8 @@ def apply_update(dl_url: str, sha256: str = "") -> tuple[bool, str]:
     exe = Path(sys.executable)                       # PinkAgcBrowser.exe đang chạy
     new = exe.with_name(exe.stem + "_new.exe")
     try:
-        with urllib.request.urlopen(dl_url, timeout=120) as r, open(new, "wb") as f:  # timeout tránh treo vô hạn
+        req = urllib.request.Request(dl_url, headers={"User-Agent": f"PinkAgcBrowser/{brand.VERSION}"})
+        with urllib.request.urlopen(req, timeout=120) as r, open(new, "wb") as f:  # timeout tránh treo vô hạn
             while True:
                 chunk = r.read(1 << 20)
                 if not chunk:

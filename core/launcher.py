@@ -70,6 +70,7 @@ _CAMO_CODE = (
     "import json,sys,time,threading\n"
     "from camoufox.sync_api import Camoufox\n"
     "kw=json.loads(sys.argv[1])\n"
+    "_ck=kw.pop('_cookies_pending', None) or []\n"
     "try:\n"
     "    cam=Camoufox(**kw)\n"
     "except ValueError as e:\n"
@@ -77,6 +78,9 @@ _CAMO_CODE = (
     "        kw.pop('webgl_config'); cam=Camoufox(**kw)\n"
     "    else: raise\n"
     "with cam as b:\n"
+    "    if _ck:\n"
+    "        try: b.add_cookies(_ck)\n"
+    "        except Exception: pass\n"
     "    print('CAMOUFOX_READY', flush=True)\n"
     "    stop=threading.Event()\n"
     "    def _wait_stdin():\n"
@@ -135,6 +139,9 @@ def serve_profile(profile: Profile, profiles_root: str | Path, *,
     đi qua relay cục bộ không-auth (như các engine Chromium). Lỗi thật của camoufox được nêu rõ.
     """
     kwargs, _ = build_launch_kwargs(profile, profiles_root, headless=headless)
+    pend = (profile.dynamic_data or {}).get("cookies_pending")
+    if pend:
+        kwargs["_cookies_pending"] = pend
     relay = None
     if kwargs.get("proxy"):
         kwargs["proxy"], relay = maybe_relay(kwargs["proxy"])   # auth -> relay http cục bộ; Firefox dùng được

@@ -68,8 +68,9 @@ def build_args(n: NormalizedFingerprint, *, seed: int, user_data_dir: str, port:
         args.append(f"--timezone={n.timezone}")
     if n.do_not_track:
         args.append("--fingerprint-dnt")
-    args += ["--fingerprint-disable-bluetooth", "--fingerprint-webgpu",
-             "--webrtc-ip-handling-policy=disable_non_proxied_udp"]
+    if n.user_agent:
+        args.append(f"--user-agent={n.user_agent}")
+    args += ["--fingerprint-disable-bluetooth", "--fingerprint-webgpu"]
     if n.proxy:
         # Chống rò DNS: tắt DoH (Chrome đi DNS-over-HTTPS thẳng, không qua proxy) + tắt prefetch.
         # Qua proxy HTTP(relay)->socks5 remote-DNS nên resolver nằm ở exit IP, cùng quốc gia proxy.
@@ -110,6 +111,11 @@ def serve(profile_fp: dict, profile_dyn: dict, profiles_root: str | Path, *,
     udd.mkdir(parents=True, exist_ok=True)
     args = build_args(n, seed=int(seed), user_data_dir=str(udd), port=port,
                       brand_version=bver, noise=noise, headless=headless)
+    webrtc_mode = str(((profile_fp or {}).get("webrtc", {}) or {}).get("mode", "BaseOnIp")).lower()
+    if webrtc_mode != "real":
+        args.append("--webrtc-ip-handling-policy=disable_non_proxied_udp")
+    if (profile_dyn or {}).get("limit_window") and n.screen_wh and not headless:
+        args.append(f"--window-size={n.screen_wh[0]},{n.screen_wh[1]}")
     exts = [e for e in ((profile_dyn or {}).get("extensions") or []) if Path(e).is_dir()]
     if exts:                                      # nạp extension unpacked (--headless=new hỗ trợ)
         args += [f"--load-extension={','.join(exts)}", f"--disable-extensions-except={','.join(exts)}"]
@@ -124,7 +130,8 @@ def serve(profile_fp: dict, profile_dyn: dict, profiles_root: str | Path, *,
         if fm and Path(fm).is_file():
             args.append(f"--use-file-for-fake-audio-capture={fm}")   # .wav
     args += [a for a in str((profile_dyn or {}).get("chrome_params") or "").split() if a]   # flag tuỳ chỉnh
-    starturls = [u for u in str((profile_dyn or {}).get("start_url") or "").split() if u]    # URL khởi động
+    raw_urls = (profile_dyn or {}).get("start_url") or (profile_fp or {}).get("startup_urls") or ""
+    starturls = [u for u in str(raw_urls).split() if u]    # URL khởi động
     proc = subprocess.Popen([binary, *args, *starturls], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         ws = _read_cdp_ws(port)

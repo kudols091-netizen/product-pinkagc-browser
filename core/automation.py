@@ -164,8 +164,12 @@ def _compare(left: str, op: str, right: str) -> bool:
 
 def _image_click(page: Any, template_path: str, threshold: float, workdir: Path) -> bool:
     """OpenCV template-match template trên screenshot trang -> click tâm match nếu >= threshold."""
-    import cv2
-    import numpy as np
+    try:
+        import cv2
+        import numpy as np
+    except ImportError as e:
+        raise RuntimeError(
+            "image_click cần opencv-python-headless và numpy (không kèm trong bản .exe rút gọn)") from e
     tpl_path = template_path if Path(template_path).is_absolute() else str(workdir / template_path)
     tpl = cv2.imread(tpl_path, cv2.IMREAD_COLOR)
     if tpl is None:
@@ -202,6 +206,18 @@ def _connect(pw: Any, engine: str, ws_endpoint: str) -> Any:
                 "điều khiển từ xa) — dùng engine Chromium (ovobrowser/fpchromium) cho automation.")
         return pw.firefox.connect(ws_endpoint)
     return pw.chromium.connect_over_cdp(ws_endpoint)
+
+
+def get_cookies(ws_endpoint: str, *, engine: str = "chromium") -> list[dict]:
+    """Đọc cookie hiện tại từ trình duyệt đang mở qua CDP. Không ngắt phiên duyệt."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        browser = _connect(pw, engine, ws_endpoint)
+        ctx = browser.contexts[0] if browser.contexts else browser.new_context()
+        try:
+            return ctx.cookies()
+        finally:
+            browser.close()
 
 
 def inject_cookies(ws_endpoint: str, cookies: list[dict], *, engine: str = "chromium") -> int:
@@ -474,8 +490,13 @@ def _exec_leaf(s: dict, ctx: _Ctx, i: int) -> None:
         _http("POST", f"https://api.telegram.org/bot{g('token')}/sendMessage", "",
               "", v, 15, json_body={"chat_id": g("chatid"), "text": g("message")})
     elif act == "solve_captcha":
+        sitekey = g("sitekey")
+        if not sitekey:
+            sitekey = page.evaluate(_FIND_SITEKEY_JS) or ""
+        if not sitekey:
+            raise RuntimeError("solve_captcha: không tìm thấy sitekey (truyền 'sitekey' hoặc mở trang có reCAPTCHA/hCaptcha)")
         tok = _solve_captcha_2captcha(g("apikey"), g("type", "recaptcha_v2"),
-                                      g("sitekey"), page.url, g("action"))
+                                      sitekey, page.url, g("action"))
         save(s.get("as", "captcha"), tok)
         if str(s.get("inject", "true")).lower() == "true" and tok:
             page.evaluate(_CAPTCHA_INJECT_JS, tok)
@@ -517,6 +538,16 @@ def _http(method: str, url: str, body: str, headers_raw: str, vars: dict,
     with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 (URL do user nhập)
         return r.read().decode("utf-8", "replace")
 
+
+_FIND_SITEKEY_JS = """() => {
+  const el = document.querySelector('[data-sitekey]');
+  if (el) return el.getAttribute('data-sitekey') || '';
+  for (const fr of document.querySelectorAll('iframe[src]')) {
+    const m = fr.src.match(/[?&](?:k|sitekey)=([^&]+)/i);
+    if (m) return decodeURIComponent(m[1]);
+  }
+  return '';
+}"""
 
 _CAPTCHA_INJECT_JS = """tok => {
   const set = (sel) => { const e = document.querySelector(sel); if (e) { e.value = tok;

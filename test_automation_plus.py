@@ -45,7 +45,10 @@ def test_validate_nested():
 
 class _FakePage:
     """Page giả tối thiểu cho các action KHÔNG đụng trình duyệt (set_var/inc/if/loop/foreach/log)."""
+    url = "https://example.com"
     def set_default_timeout(self, *_a): pass
+    def evaluate(self, js, *_a):
+        return getattr(self, "_eval_ret", "")
 
 
 def test_control_flow():
@@ -76,8 +79,34 @@ def test_control_flow():
     print("[ok] control-flow (loop/foreach/if/stop + biến)")
 
 
+def test_solve_captcha_auto_sitekey():
+    orig_solve = A._solve_captcha_2captcha
+    seen = {}
+    def fake_solve(apikey, ctype, sitekey, pageurl, action):
+        seen.update({"apikey": apikey, "sitekey": sitekey, "url": pageurl})
+        return "tok-ok"
+    A._solve_captcha_2captcha = fake_solve
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            pg = _FakePage()
+            pg._eval_ret = ""
+            ctx = A._Ctx(browser=None, page=pg, workdir=Path(d), timeout=1000)
+            try:
+                A._exec_leaf({"action": "solve_captcha", "apikey": "k1", "sitekey": ""}, ctx, 0)
+                assert False, "phải báo lỗi khi không tìm thấy sitekey"
+            except RuntimeError as e:
+                assert "sitekey" in str(e)
+            pg._eval_ret = "6Le-auto-key"
+            A._exec_leaf({"action": "solve_captcha", "apikey": "k1", "sitekey": "", "inject": "false"}, ctx, 0)
+            assert seen["sitekey"] == "6Le-auto-key" and ctx.vars["captcha"] == "tok-ok"
+    finally:
+        A._solve_captcha_2captcha = orig_solve
+    print("[ok] solve_captcha auto-sitekey detection")
+
+
 if __name__ == "__main__":
     test_pure_helpers()
     test_validate_nested()
     test_control_flow()
+    test_solve_captcha_auto_sitekey()
     print("\nALL AUTOMATION-PLUS CHECKS PASSED")

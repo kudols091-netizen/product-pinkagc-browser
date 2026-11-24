@@ -38,7 +38,11 @@ def test_botbrowser_configs():
     a2 = botbrowser.build_args(n, bot_profile="x.enc", user_data_dir="d", port=1, headless=False)
     assert "--proxy-server=http://u:p@1.2.3.4:8080" in a2
     assert not any(x.startswith("--proxy-username") for x in a2)
-    print("[ok] botbrowser configs + args")
+    from core import ovobrowser
+    n.user_agent = "CustomAgent/2.0"
+    ovo_args = ovobrowser.build_args(n, seed=123, user_data_dir="d", port=9222, headless=True)
+    assert "--user-agent=CustomAgent/2.0" in ovo_args
+    print("[ok] botbrowser + ovobrowser configs + args")
 
 
 def test_pick_profile():
@@ -98,7 +102,32 @@ def test_api_smoke():
         assert "tinproxy" in c.get("/api/v3/proxy/providers").get_json()["data"]
         assert c.delete(f"/api/v3/profiles/{pid}").get_json()["data"]["deleted"]
         assert c.get("/api/v3/profiles").get_json()["data"] == []
-    print("[ok] API smoke (create/list/proxy/delete/UI)")
+
+        # IPv6 _guard_host (có & không port) + chặn DNS-rebinding
+        assert c.get("/api/v3/health", headers={"Host": "[::1]"}).status_code == 200
+        assert c.get("/api/v3/health", headers={"Host": "[::1]:19996"}).status_code == 200
+        assert c.get("/api/v3/health", headers={"Host": "evil.com:19996"}).status_code == 403
+        assert c.get("/api/v3/health", headers={"Host": "[::1].evil.com"}).status_code == 403
+
+        # create với fp_overrides + start_url (khớp các tab Tạo profile)
+        r2 = c.post("/api/v3/profiles/create", json={
+            "name": "custom1", "os": "Windows", "start_url": "https://example.org",
+            "fp_overrides": {
+                "webrtc": {"mode": "Disable"},
+                "screen": {"name": "Custom", "width": 1920, "height": 1080},
+                "canvas": {"mode": "Real"},
+                "navigator": {"allow_custom_user_agent": True, "user_agent": "CustomUA/1.0",
+                              "auto_language": False, "language": "vi-VN", "do_not_track": True},
+            },
+        }).get_json()["data"]
+        full = c.get(f"/api/v3/profiles/{r2['id']}").get_json()["data"]
+        assert full["dynamic_data"]["start_url"] == "https://example.org"
+        assert full["fingerprint_data"]["webrtc"]["mode"] == "Disable"
+        assert full["fingerprint_data"]["screen"]["width"] == 1920
+        assert full["fingerprint_data"]["canvas"]["mode"] == "Real"
+        assert full["fingerprint_data"]["navigator"]["user_agent"] == "CustomUA/1.0"
+        assert full["fingerprint_data"]["navigator"]["language"] == "vi-VN"
+    print("[ok] API smoke (create/list/proxy/delete/UI/guard/fp_overrides)")
 
 
 if __name__ == "__main__":

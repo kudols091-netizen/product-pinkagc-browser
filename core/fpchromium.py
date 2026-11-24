@@ -64,6 +64,8 @@ def build_args(n: NormalizedFingerprint, *, seed: int, user_data_dir: str, port:
         args.append(f"--accept-lang={n.language}")
     if n.timezone:
         args.append(f"--timezone={n.timezone}")
+    if n.user_agent:
+        args.append(f"--user-agent={n.user_agent}")
     if headless:
         # headless=new + WebGL cần swiftshader, nếu không GPU process crash ("Target crashed").
         args += ["--headless=new", "--enable-unsafe-swiftshader"]
@@ -99,6 +101,8 @@ def serve(profile_fp: dict, profile_dyn: dict, profiles_root: str | Path, *,
     udd.mkdir(parents=True, exist_ok=True)
     args = build_args(n, seed=int(seed), user_data_dir=str(udd), port=port,
                       brand_version=bver, headless=headless)
+    if (profile_dyn or {}).get("limit_window") and n.screen_wh and not headless:
+        args.append(f"--window-size={n.screen_wh[0]},{n.screen_wh[1]}")
     exts = [e for e in ((profile_dyn or {}).get("extensions") or []) if Path(e).is_dir()]
     if exts:
         args += [f"--load-extension={','.join(exts)}", f"--disable-extensions-except={','.join(exts)}"]
@@ -113,7 +117,8 @@ def serve(profile_fp: dict, profile_dyn: dict, profiles_root: str | Path, *,
         if fm and Path(fm).is_file():
             args.append(f"--use-file-for-fake-audio-capture={fm}")
     args += [a for a in str((profile_dyn or {}).get("chrome_params") or "").split() if a]
-    args += [u for u in str((profile_dyn or {}).get("start_url") or "").split() if u]        # URL khởi động
+    raw_urls = (profile_dyn or {}).get("start_url") or (profile_fp or {}).get("startup_urls") or ""
+    args += [u for u in str(raw_urls).split() if u]        # URL khởi động
     if os.environ.get("FPC_DEBUG"):
         logf = open(udd / "chrome.log", "w", encoding="utf-8", errors="replace")
         print("[fpc args]", " ".join(args))

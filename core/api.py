@@ -129,7 +129,12 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
 
     @app.before_request
     def _guard_host():                                # chặn DNS-rebinding: web ngoài trỏ domain -> 127.0.0.1
-        host = (request.host or "").rsplit(":", 1)[0].strip("[]")
+        raw_host = request.host or ""
+        if raw_host.startswith("["):
+            end = raw_host.find("]")
+            host = raw_host[1:end] if end > 0 and (end == len(raw_host) - 1 or raw_host[end + 1] == ":") else raw_host
+        else:
+            host = raw_host.rsplit(":", 1)[0]
         if host not in _ALLOWED_HOSTS:
             return jsonify({"error": "forbidden host"}), 403
 
@@ -189,8 +194,18 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         _log.append({"ts": datetime.now(timezone.utc).isoformat(), "kind": kind, "msg": msg})
         del _log[:-300]            # giữ tối đa 300 dòng gần nhất
 
+    def _clear_profile_cache(profile_dir: Path) -> None:
+        """Xoá cache trình duyệt khi đóng nếu bật clear_cache (giữ nguyên Cookies/Local Storage/Sessions)."""
+        import shutil
+        for base in (profile_dir, profile_dir / "Default"):
+            for sub in ("Cache", "Code Cache", "GPUCache", "DawnCache", "ShaderCache", "GrShaderCache", "cache2"):
+                t = base / sub
+                if t.is_dir():
+                    shutil.rmtree(t, ignore_errors=True)
+
     # ---- helpers dùng chung cho route lẻ + bulk ----
     def _start_one(pid: str, opts: dict) -> dict:
+        from dataclasses import replace as _dc_replace
         p = db.get_profile(pid)
         if not p:
             return {"id": pid, "error": "not found"}
@@ -204,8 +219,12 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             _starting.add(pid)
         try:
             engine = engines.resolve_engine(p, opts.get("engine"))
+            s = _load_settings()
+            launch_dyn = {**(p.dynamic_data or {})}
+            launch_dyn.setdefault("limit_window", bool(s.get("limit_window", True)))
+            launch_p = _dc_replace(p, dynamic_data=launch_dyn)
             try:
-                handle, ep = engines.serve(engine, p, profiles_root, headless=bool(opts.get("headless", False)))
+                handle, ep = engines.serve(engine, launch_p, profiles_root, headless=bool(opts.get("headless", False)))
             except Exception as e:  # noqa: BLE001
                 return {"id": pid, "error": f"launch failed ({engine}): {e}"}
             with _rlock:
@@ -214,13 +233,14 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             with _rlock:
                 _starting.discard(pid)
         db.mark_run(pid)
-        dyn = p.dynamic_data or {}
+        dyn = dict(p.dynamic_data or {})
         pend = dyn.pop("cookies_pending", None)      # nạp cookie import vào trình duyệt vừa mở
-        if pend and engine != "camoufox":
+        if pend:
             try:
-                from . import automation
-                automation.inject_cookies(ep, pend, engine=engine)
-                db.set_dynamic_data(pid, dyn)        # xoá pending (Chromium đã persist vào profile)
+                if engine != "camoufox":
+                    from . import automation
+                    automation.inject_cookies(ep, pend, engine=engine)
+                db.set_dynamic_data(pid, dyn)        # xoá pending sau khi đã nạp (Chromium & Camoufox)
             except Exception:  # noqa: BLE001
                 pass
         _btype = ((p.fingerprint_data or {}).get("browser", {}) or {}).get("browser_type", "Chrome")
@@ -233,6 +253,8 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         if item:
             engines.graceful_stop(item[0], item[1], item[2])   # đóng mềm Chromium rồi terminate
             _p = db.get_profile(pid)
+            if _p and _load_settings().get("clear_cache"):
+                _clear_profile_cache(Path(profiles_root) / (_p.storage_path or pid))
             log_event("stop", f"Đã đóng profile {_p.name if _p else pid[:8]}")
         return {"id": pid, "stopped": bool(item)}
 
@@ -332,12 +354,20 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
                 import random as _r
                 w, h = _r.choice(_SCREENS)
                 fp.setdefault("screen", {}).update({"name": "Random", "width": w, "height": h})
+            patch = b.get("fp_overrides")
+            if isinstance(patch, dict):
+                for k, v in patch.items():
+                    if isinstance(v, dict) and isinstance(fp.get(k), dict):
+                        fp[k].update(v)
+                    else:
+                        fp[k] = v
         dyn = b.get("dynamic_data") or {}
         eng = b.get("engine") if b.get("engine") is not None else s["default_engine"]
         if eng:
             dyn["engine"] = eng
-        if s.get("start_url"):
-            dyn["start_url"] = s["start_url"]
+        start_url = b.get("start_url") if b.get("start_url") else s.get("start_url")
+        if start_url:
+            dyn["start_url"] = start_url
         if s.get("chrome_params"):
             dyn["chrome_params"] = s["chrome_params"]
         return db.create_profile(name, fp, group_id=b.get("group_id"), dynamic_data=dyn)
@@ -886,11 +916,15 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
             return _err("schedule not found", 404)
         sc = db.get_script(s["script_id"]) if s.get("script_id") else None
         steps = (sc or {}).get("steps") or []
-        fired = 0
-        for ppid in s["profile_ids"]:
-            _run_profile_script(ppid, steps, script_name=s["name"], source="manual")
-            fired += 1
-        return _ok({"fired": fired})
+        pids = list(s["profile_ids"])
+        def _bg():
+            for ppid in pids:
+                try:
+                    _run_profile_script(ppid, steps, script_name=s["name"], source="manual")
+                except Exception:  # noqa: BLE001
+                    pass
+        threading.Thread(target=_bg, daemon=True).start()
+        return _ok({"fired": len(pids), "async": True})
 
     @app.post("/api/v3/proxy/check")
     def proxy_check():
@@ -970,6 +1004,14 @@ def create_app(db_path: str | Path, profiles_root: str | Path) -> Flask:
         p = db.get_profile(pid)
         if not p:
             return _err("profile not found", 404)
+        with _rlock:
+            rec = running.get(pid)
+        if rec and rec[2] != "camoufox":
+            try:
+                from . import automation
+                return _ok(automation.get_cookies(rec[1], engine=rec[2]))
+            except Exception:  # noqa: BLE001
+                pass
         return _ok((p.dynamic_data or {}).get("cookies") or [])
 
     @app.post("/api/v3/profiles/<pid>/cookies")

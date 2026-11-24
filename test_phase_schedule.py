@@ -32,6 +32,13 @@ def test_scripts_schedules_api():
         assert c.get("/api/v3/schedules").get_json()["data"][0]["enabled"] is False
         # runs rỗng ban đầu
         assert c.get("/api/v3/runs").get_json()["data"] == []
+        # run-now trả async ngay (không block HTTP request)
+        schid2 = c.post("/api/v3/schedules", json={"name": "L2", "script_id": sid,
+                        "profile_ids": [], "kind": "interval", "interval_min": 30}
+                        ).get_json()["data"]["id"]
+        rn = c.post(f"/api/v3/schedules/{schid2}/run-now").get_json()["data"]
+        assert rn["fired"] == 0 and rn["async"] is True
+        c.delete(f"/api/v3/schedules/{schid2}")
         # delete
         c.delete(f"/api/v3/scripts/{sid}"); c.delete(f"/api/v3/schedules/{schid}")
         assert c.get("/api/v3/scripts").get_json()["data"] == []
